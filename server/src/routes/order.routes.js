@@ -1,0 +1,393 @@
+const express = require('express');
+const router = express.Router();
+const prisma = require('../config/database');
+const stripe = require('../config/stripe');
+const { authenticate, optionalAuth, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { AppError } = require('../middleware/errorHandler');
+const { createOrderSchema, updateOrderStatusSchema } = require('../validators/order.validator');
+
+// ─── HELPERS ──────────────────────────────────────────────
+
+const TAX_RATE = 0.0825; // 8.25% — configurable via settings in prod
+const DELIVERY_FEE = 5.00;
+
+async function generateOrderNumber() {
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const count = await prisma.order.count({
+    where: {
+      createdAt: {
+        gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+        lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+      },
+    },
+  });
+  return `PCP-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+}
+
+// ─── CREATE ORDER ─────────────────────────────────────────
+
+router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, next) => {
+  try {
+    const {
+      items, fulfillmentType, scheduledDate, timeslotId,
+      deliveryAddress, deliveryZip, deliveryNotes,
+      paymentMethod, tipAmount, promoCode,
+      guestEmail, guestFirstName, guestLastName, guestPhone,
+      productionNotes, source,
+    } = req.body;
+
+    // ── Resolve line items & calculate prices ──
+    const productIds = items.map((i) => i.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, isActive: true },
+      include: { variants: true, addons: true },
+    });
+
+    const productMap = Object.fromEntries(products.map((p) => [p.id, p]));
+
+    let subtotal = 0;
+    const orderItemsData = [];
+
+    for (const item of items) {
+      const product = productMap[item.productId];
+      if (!product) throw new AppError(`Product ${item.productId} not found or inactive`, 400);
+
+      let unitPrice = parseFloat(product.basePrice);
+      let variantId = null;
+
+      if (item.variantId) {
+        const variant = product.variants.find((v) => v.id === item.variantId && v.isActive);
+        if (!variant) throw new AppError(`Variant ${item.variantId} not found`, 400);
+        unitPrice = parseFloat(variant.price);
+        variantId = variant.id;
+      }
+
+      const totalPrice = unitPrice * item.quantity;
+      subtotal += totalPrice;
+
+      const addonData = [];
+      if (item.addons?.length) {
+        for (const addonReq of item.addons) {
+          const addon = product.addons.find((a) => a.id === addonReq.addonId && a.isActive);
+          // Also check global addons
+          const globalAddon = addon || await prisma.productAddon.findFirst({
+            where: { id: addonReq.addonId, isGlobal: true, isActive: true },
+          });
+          if (!globalAddon) throw new AppError(`Addon ${addonReq.addonId} not found`, 400);
+
+          const addonPrice = parseFloat(globalAddon.price);
+          subtotal += addonPrice * item.quantity;
+
+          addonData.push({
+            addonId: globalAddon.id,
+            price: addonPrice,
+            value: addonReq.value || null,
+          });
+        }
+      }
+
+      orderItemsData.push({
+        productId: product.id,
+        variantId,
+        quantity: item.quantity,
+        unitPrice,
+        totalPrice,
+        notes: item.notes || null,
+        addons: { create: addonData },
+      });
+    }
+
+    // ── Promo ──
+    let discountAmount = 0;
+    let promoId = null;
+    if (promoCode) {
+      const promo = await prisma.promo.findUnique({ where: { code: promoCode.toUpperCase() } });
+      if (!promo || !promo.isActive) throw new AppError('Invalid promo code', 400);
+
+      const now = new Date();
+      if (promo.startsAt && now < promo.startsAt) throw new AppError('Promo not yet active', 400);
+      if (promo.expiresAt && now > promo.expiresAt) throw new AppError('Promo has expired', 400);
+      if (promo.maxUses && promo.usedCount >= promo.maxUses) throw new AppError('Promo usage limit reached', 400);
+      if (promo.minOrderAmount && subtotal < parseFloat(promo.minOrderAmount)) {
+        throw new AppError(`Minimum order of $${promo.minOrderAmount} required`, 400);
+      }
+
+      if (promo.type === 'PERCENTAGE') {
+        discountAmount = subtotal * parseFloat(promo.value) / 100;
+      } else if (promo.type === 'FIXED_AMOUNT') {
+        discountAmount = Math.min(parseFloat(promo.value), subtotal);
+      }
+      promoId = promo.id;
+    }
+
+    // ── Totals ──
+    const deliveryFee = fulfillmentType === 'DELIVERY' ? DELIVERY_FEE : 0;
+    const taxableAmount = subtotal - discountAmount;
+    const taxAmount = Math.round(taxableAmount * TAX_RATE * 100) / 100;
+    const totalAmount = Math.round((taxableAmount + taxAmount + deliveryFee + (tipAmount || 0)) * 100) / 100;
+
+    // ── Customer linkage ──
+    let customerId = null;
+    if (req.user) {
+      const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+      if (customer) customerId = customer.id;
+    }
+
+    // ── Stripe payment intent ──
+    let stripePaymentId = null;
+    let clientSecret = null;
+    if (paymentMethod === 'STRIPE_CARD' && totalAmount > 0) {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(totalAmount * 100), // cents
+        currency: 'usd',
+        metadata: { source: source || 'web' },
+      });
+      stripePaymentId = paymentIntent.id;
+      clientSecret = paymentIntent.client_secret;
+    }
+
+    // ── Create order ──
+    const orderNumber = await generateOrderNumber();
+
+    const order = await prisma.order.create({
+      data: {
+        orderNumber,
+        customerId,
+        status: 'NEW',
+        fulfillmentType,
+        subtotal,
+        taxAmount,
+        deliveryFee,
+        tipAmount: tipAmount || 0,
+        discountAmount,
+        totalAmount,
+        paymentMethod: paymentMethod || 'STRIPE_CARD',
+        stripePaymentId,
+        isPaid: paymentMethod === 'CASH' || paymentMethod === 'COMP',
+        paidAt: paymentMethod === 'CASH' || paymentMethod === 'COMP' ? new Date() : null,
+        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+        timeslotId: timeslotId || null,
+        deliveryAddress,
+        deliveryZip,
+        deliveryNotes,
+        productionNotes,
+        source: source || 'web',
+        guestEmail,
+        guestFirstName,
+        guestLastName,
+        guestPhone,
+        items: { create: orderItemsData },
+      },
+      include: {
+        items: { include: { product: true, variant: true, addons: { include: { addon: true } } } },
+        customer: true,
+      },
+    });
+
+    // ── Update promo usage ──
+    if (promoId) {
+      await prisma.promo.update({ where: { id: promoId }, data: { usedCount: { increment: 1 } } });
+      await prisma.promoRedemption.create({
+        data: { promoId, orderId: order.id, customerId, amount: discountAmount },
+      });
+    }
+
+    // ── Update timeslot count ──
+    if (timeslotId) {
+      await prisma.timeslot.update({ where: { id: timeslotId }, data: { currentCount: { increment: 1 } } });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: { order, clientSecret },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── GET ORDERS ───────────────────────────────────────────
+
+// GET /api/orders — admin: all, customer: own
+router.get('/', authenticate, async (req, res, next) => {
+  try {
+    const {
+      status, fulfillmentType, source, search,
+      startDate, endDate,
+      sortBy = 'createdAt', sortDir = 'desc',
+      page = 1, limit = 25,
+    } = req.query;
+
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'BAKER'].includes(req.user.role);
+    const where = {};
+
+    if (!isAdmin) {
+      // Customers can only see their own orders
+      const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+      if (!customer) return res.json({ success: true, data: [], meta: { total: 0 } });
+      where.customerId = customer.id;
+    }
+
+    if (status) where.status = status;
+    if (fulfillmentType) where.fulfillmentType = fulfillmentType;
+    if (source) where.source = source;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate);
+    }
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { guestEmail: { contains: search, mode: 'insensitive' } },
+        { guestFirstName: { contains: search, mode: 'insensitive' } },
+        { guestLastName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const allowedSort = ['createdAt', 'totalAmount', 'orderNumber', 'status'];
+    const orderField = allowedSort.includes(sortBy) ? sortBy : 'createdAt';
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+          items: { include: { product: { select: { id: true, name: true } }, variant: true } },
+        },
+        orderBy: { [orderField]: sortDir === 'asc' ? 'asc' : 'desc' },
+        skip,
+        take,
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: orders,
+      meta: { total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/orders/:id
+router.get('/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        assignedBaker: { select: { id: true, firstName: true, lastName: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, images: { where: { isPrimary: true }, take: 1 } } },
+            variant: true,
+            addons: { include: { addon: true } },
+          },
+        },
+        promoRedemptions: { include: { promo: { select: { code: true, type: true, value: true } } } },
+        timeslot: true,
+      },
+    });
+
+    if (!order) throw new AppError('Order not found', 404);
+
+    // Customers can only see their own
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'BAKER'].includes(req.user.role);
+    if (!isAdmin) {
+      const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+      if (!customer || order.customerId !== customer.id) {
+        throw new AppError('Order not found', 404);
+      }
+    }
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── ADMIN ────────────────────────────────────────────────
+
+// PATCH /api/orders/:id/status
+router.patch('/:id/status', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER', 'BAKER'), validate(updateOrderStatusSchema), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, productionNotes, assignedBakerId, packagingChecklist } = req.body;
+
+    const existing = await prisma.order.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Order not found', 404);
+
+    const updateData = { status };
+    if (productionNotes !== undefined) updateData.productionNotes = productionNotes;
+    if (assignedBakerId !== undefined) updateData.assignedBakerId = assignedBakerId;
+    if (packagingChecklist !== undefined) updateData.packagingChecklist = packagingChecklist;
+
+    // Mark as paid when completed if paid via Stripe and confirmed
+    if (status === 'COMPLETED' && existing.stripePaymentId && !existing.isPaid) {
+      updateData.isPaid = true;
+      updateData.paidAt = new Date();
+    }
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/orders/:id/refund
+router.post('/:id/refund', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body;
+
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) throw new AppError('Order not found', 404);
+
+    let stripeRefundId = null;
+    if (order.stripePaymentId) {
+      const refundParams = {
+        payment_intent: order.stripePaymentId,
+        reason: reason || 'requested_by_customer',
+      };
+      if (amount) {
+        refundParams.amount = Math.round(amount * 100); // partial refund in cents
+      }
+
+      const refund = await stripe.refunds.create(refundParams);
+      stripeRefundId = refund.id;
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: {
+        status: 'REFUNDED',
+        stripeRefundId,
+      },
+    });
+
+    res.json({ success: true, data: updatedOrder });
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;
