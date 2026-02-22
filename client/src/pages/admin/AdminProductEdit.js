@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Box, Typography, Grid, Paper, Button, TextField, MenuItem,
   Select, FormControl, InputLabel, Chip, Switch, FormControlLabel, Divider,
   CircularProgress, IconButton, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Checkbox, OutlinedInput
+  TableHead, TableRow, Checkbox, OutlinedInput, ImageList, ImageListItem,
+  ImageListItemBar
 } from '@mui/material';
-import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload } from '@mui/icons-material';
+import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
+
+const API_HOST = process.env.REACT_APP_API_HOST || 'http://localhost:5000';
 
 const BADGE_OPTIONS = ['Best Seller', 'New', 'Limited', 'Gluten-Free', 'Vegan', 'Seasonal', 'Staff Pick'];
 
@@ -33,6 +36,9 @@ const AdminProductEdit = () => {
   const [variants, setVariants] = useState([]);
   const [addons, setAddons] = useState([]);
   const [selectedAllergens, setSelectedAllergens] = useState([]);
+  const [productImages, setProductImages] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -69,6 +75,7 @@ const AdminProductEdit = () => {
           setVariants(p.variants || []);
           setAddons(p.addons || []);
           setSelectedAllergens((p.allergenTags || []).map(t => t.allergenId || t.allergen?.id));
+          setProductImages(p.images || []);
         }
       } catch (err) {
         showSnackbar('Failed to load data', 'error');
@@ -99,6 +106,48 @@ const AdminProductEdit = () => {
   const addAddon = () => setAddons(a => [...a, { name: '', price: '', isActive: true, isNew: true }]);
   const removeAddon = (idx) => setAddons(a => a.filter((_, i) => i !== idx));
   const updateAddon = (idx, field, val) => setAddons(a => a.map((item, i) => i === idx ? { ...item, [field]: val } : item));
+
+  const handleImageUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || isNew) return;
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('images', files[i]);
+    }
+    setUploadingImages(true);
+    try {
+      const { data } = await api.post(`/products/${id}/images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setProductImages(prev => [...prev, ...(data.data || [])]);
+      showSnackbar('Images uploaded!', 'success');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to upload images', 'error');
+    } finally {
+      setUploadingImages(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
+  const handleSetPrimary = async (imageId) => {
+    try {
+      await api.put(`/products/${id}/images/${imageId}/primary`);
+      setProductImages(prev => prev.map(img => ({ ...img, isPrimary: img.id === imageId })));
+      showSnackbar('Primary image updated', 'success');
+    } catch {
+      showSnackbar('Failed to set primary image', 'error');
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    try {
+      await api.delete(`/products/${id}/images/${imageId}`);
+      setProductImages(prev => prev.filter(img => img.id !== imageId));
+      showSnackbar('Image deleted', 'success');
+    } catch {
+      showSnackbar('Failed to delete image', 'error');
+    }
+  };
 
   const handleSave = async () => {
     if (!form.name || !form.categoryId || !form.basePrice) {
@@ -328,21 +377,63 @@ const AdminProductEdit = () => {
           {/* Image Upload Area */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Images</Typography>
+
+            {/* Existing images */}
+            {productImages.length > 0 && (
+              <ImageList cols={4} gap={8} sx={{ mb: 2 }}>
+                {productImages.map((img) => (
+                  <ImageListItem key={img.id} sx={{ borderRadius: 2, overflow: 'hidden', border: img.isPrimary ? '2px solid' : '1px solid', borderColor: img.isPrimary ? 'primary.main' : 'divider' }}>
+                    <img src={`${API_HOST}${img.url}`} alt={img.alt || 'Product'} loading="lazy" style={{ height: 120, objectFit: 'cover' }} />
+                    <ImageListItemBar
+                      sx={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+                      actionIcon={
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton size="small" sx={{ color: 'white' }} onClick={() => handleSetPrimary(img.id)} title="Set as primary">
+                            {img.isPrimary ? <Star sx={{ color: '#ffd700' }} /> : <StarBorder />}
+                          </IconButton>
+                          <IconButton size="small" sx={{ color: 'white' }} onClick={() => handleDeleteImage(img.id)} title="Delete">
+                            <Delete />
+                          </IconButton>
+                        </Box>
+                      }
+                    />
+                  </ImageListItem>
+                ))}
+              </ImageList>
+            )}
+
+            {/* Upload area */}
             <Box
+              onClick={() => !isNew && imageInputRef.current?.click()}
               sx={{
                 border: '2px dashed', borderColor: 'divider', borderRadius: 2,
-                p: 4, textAlign: 'center', cursor: 'pointer',
-                '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.main', bgcolor: 'rgba(196,149,106,0.04)' },
+                p: 4, textAlign: 'center', cursor: isNew ? 'not-allowed' : 'pointer',
+                opacity: isNew ? 0.5 : 1,
+                '&:hover': isNew ? {} : { borderColor: 'primary.main', bgcolor: 'rgba(196,149,106,0.04)' },
               }}
             >
-              <CloudUpload sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-              <Typography variant="body2" color="text.secondary">
-                Drag and drop images here, or click to browse
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Supports JPG, PNG, WebP up to 5MB
-              </Typography>
+              {uploadingImages ? (
+                <CircularProgress size={32} sx={{ color: 'primary.main' }} />
+              ) : (
+                <>
+                  <CloudUpload sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {isNew ? 'Save the product first, then upload images' : 'Click to upload images'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Supports JPG, PNG, WebP up to 5MB
+                  </Typography>
+                </>
+              )}
             </Box>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              style={{ display: 'none' }}
+              onChange={handleImageUpload}
+            />
           </Paper>
         </Grid>
 

@@ -87,8 +87,8 @@ const CartPage = () => {
                       overflow: 'hidden',
                     }}
                   >
-                    {item.product.imageUrl ? (
-                      <Box component="img" src={item.product.imageUrl} alt={item.product.name}
+                    {(item.product.images?.[0]?.url || item.product.imageUrl) ? (
+                      <Box component="img" src={item.product.images?.[0]?.url || item.product.imageUrl} alt={item.product.name}
                         sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <Typography sx={{ fontSize: '2rem' }}>🥐</Typography>

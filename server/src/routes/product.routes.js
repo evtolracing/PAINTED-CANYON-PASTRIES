@@ -1,12 +1,46 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const crypto = require('crypto');
 const prisma = require('../config/database');
 const { authenticate, optionalAuth, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { AppError } = require('../middleware/errorHandler');
 const { productSchema, updateProductSchema } = require('../validators/product.validator');
 
+// ─── Image upload config ─────────────────────────────────
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, './uploads'),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `product-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 // ─── PUBLIC ───────────────────────────────────────────────
+
+// GET /api/products/allergens — list all allergen tags
+router.get('/allergens', async (req, res, next) => {
+  try {
+    const allergens = await prisma.allergenTag.findMany({ orderBy: { name: 'asc' } });
+    res.json({ success: true, data: allergens });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/products — list with filters, search, category, pagination
 router.get('/', optionalAuth, async (req, res, next) => {
@@ -253,6 +287,71 @@ router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (re
       await prisma.product.update({ where: { id }, data: { isActive: false } });
       res.json({ success: true, message: 'Product deactivated' });
     }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── PRODUCT IMAGES ───────────────────────────────────────
+
+// POST /api/products/:id/images — upload product image(s)
+router.post('/:id/images', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), imageUpload.array('images', 10), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Product not found', 404);
+
+    if (!req.files || req.files.length === 0) {
+      throw new AppError('No images uploaded', 400);
+    }
+
+    // Check if product already has any images
+    const existingCount = await prisma.productImage.count({ where: { productId: id } });
+
+    const images = await Promise.all(
+      req.files.map((file, index) =>
+        prisma.productImage.create({
+          data: {
+            productId: id,
+            url: `/uploads/${file.filename}`,
+            alt: existing.name,
+            isPrimary: existingCount === 0 && index === 0, // first image is primary if none exist
+            sortOrder: existingCount + index,
+          },
+        })
+      )
+    );
+
+    res.status(201).json({ success: true, data: images });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/products/:id/images/:imageId/primary — set as primary image
+router.put('/:id/images/:imageId/primary', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id, imageId } = req.params;
+
+    await prisma.$transaction([
+      prisma.productImage.updateMany({ where: { productId: id }, data: { isPrimary: false } }),
+      prisma.productImage.update({ where: { id: imageId }, data: { isPrimary: true } }),
+    ]);
+
+    res.json({ success: true, message: 'Primary image updated' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/products/:id/images/:imageId — delete product image
+router.delete('/:id/images/:imageId', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { imageId } = req.params;
+    const image = await prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!image) throw new AppError('Image not found', 404);
+    await prisma.productImage.delete({ where: { id: imageId } });
+    res.json({ success: true, message: 'Image deleted' });
   } catch (error) {
     next(error);
   }

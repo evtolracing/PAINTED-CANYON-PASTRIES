@@ -235,8 +235,8 @@ const ShopPage = () => {
                             textDecoration: 'none',
                           }}
                         >
-                          {product.imageUrl ? (
-                            <Box component="img" src={product.imageUrl} alt={product.name}
+                          {(product.images?.[0]?.url || product.imageUrl) ? (
+                            <Box component="img" src={product.images?.[0]?.url || product.imageUrl} alt={product.name}
                               sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🥐</Typography>

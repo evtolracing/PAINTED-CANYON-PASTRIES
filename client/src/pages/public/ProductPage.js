@@ -138,8 +138,8 @@ const ProductPage = () => {
                 borderColor: 'divider',
               }}
             >
-              {product.imageUrl ? (
-                <Box component="img" src={product.imageUrl} alt={product.name}
+              {(product.images?.[0]?.url || product.imageUrl) ? (
+                <Box component="img" src={product.images?.[0]?.url || product.imageUrl} alt={product.name}
                   sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <Typography variant="h1" sx={{ fontSize: '6rem', color: 'sandstone.300' }}>🎂</Typography>
@@ -300,8 +300,8 @@ const ProductPage = () => {
                     <CardMedia
                       sx={{ height: 140, bgcolor: 'sandstone.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      {p.imageUrl ? (
-                        <Box component="img" src={p.imageUrl} alt={p.name}
+                      {(p.images?.[0]?.url || p.imageUrl) ? (
+                        <Box component="img" src={p.images?.[0]?.url || p.imageUrl} alt={p.name}
                           sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <Typography sx={{ fontSize: '2.5rem', color: 'sandstone.300' }}>🥐</Typography>
