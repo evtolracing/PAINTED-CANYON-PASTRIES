@@ -25,9 +25,11 @@ const CATEGORIES = [
 ];
 
 const getBadge = (product) => {
-  if (product.isBestSeller) return { label: 'Best Seller', color: '#c4956a' };
-  if (product.isLimited || product.isSeasonal) return { label: 'Limited', color: '#e65100' };
-  if (product.isGlutenFree) return { label: 'GF', color: '#7c8b6f' };
+  const badges = product.badges || [];
+  if (badges.includes('Best Seller')) return { label: 'Best Seller', color: '#c4956a' };
+  if (badges.includes('Limited') || badges.includes('Seasonal')) return { label: 'Limited', color: '#e65100' };
+  if (badges.includes('Gluten-Free') || badges.includes('GF')) return { label: 'GF', color: '#7c8b6f' };
+  if (badges.includes('New')) return { label: 'New', color: '#2196f3' };
   return null;
 };
 

@@ -27,8 +27,8 @@ const offerings = [
 const CateringPage = () => {
   const { showSnackbar } = useSnackbar();
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', eventDate: '', guestCount: '',
-    details: '', budgetRange: '',
+    firstName: '', lastName: '', email: '', phone: '', eventDate: '', guestCount: '',
+    details: '', budget: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +38,7 @@ const CateringPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.eventDate || !form.guestCount) {
+    if (!form.firstName || !form.email || !form.eventDate || !form.guestCount) {
       showSnackbar('Please fill in all required fields.', 'error');
       return;
     }
@@ -46,10 +46,10 @@ const CateringPage = () => {
     try {
       await api.post('/catering', form);
       showSnackbar('Catering request submitted! We\'ll contact you within 24 hours.', 'success');
-      setForm({ name: '', email: '', phone: '', eventDate: '', guestCount: '', details: '', budgetRange: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', eventDate: '', guestCount: '', details: '', budget: '' });
     } catch {
       showSnackbar('Request received! We\'ll be in touch soon.', 'success');
-      setForm({ name: '', email: '', phone: '', eventDate: '', guestCount: '', details: '', budgetRange: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', eventDate: '', guestCount: '', details: '', budget: '' });
     } finally {
       setSubmitting(false);
     }
@@ -113,8 +113,12 @@ const CateringPage = () => {
             <form onSubmit={handleSubmit}>
               <Grid container spacing={2.5}>
                 <Grid item xs={12} sm={6}>
-                  <TextField label="Your Name" name="name" fullWidth required
-                    value={form.name} onChange={handleChange} />
+                  <TextField label="First Name" name="firstName" fullWidth required
+                    value={form.firstName} onChange={handleChange} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField label="Last Name" name="lastName" fullWidth
+                    value={form.lastName} onChange={handleChange} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField label="Email" name="email" type="email" fullWidth required
@@ -138,8 +142,8 @@ const CateringPage = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField
-                    label="Budget Range" name="budgetRange" select fullWidth
-                    value={form.budgetRange} onChange={handleChange}
+                    label="Budget Range" name="budget" select fullWidth
+                    value={form.budget} onChange={handleChange}
                   >
                     {BUDGET_RANGES.map((range) => (
                       <MenuItem key={range} value={range}>{range}</MenuItem>

@@ -37,7 +37,7 @@ const HomePage = () => {
   const handleNewsletter = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/newsletter/subscribe', { email });
+      await api.post('/newsletter', { email });
       showSnackbar('Welcome to the Painted Canyon family! 🌵', 'success');
       setEmail('');
     } catch {

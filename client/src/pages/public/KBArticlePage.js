@@ -15,7 +15,7 @@ const KBArticlePage = () => {
     const fetchArticle = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/kb/articles/${slug}`);
+        const { data } = await api.get(`/kb/${slug}`);
         setArticle(data.data || data);
       } catch {
         setArticle(null);

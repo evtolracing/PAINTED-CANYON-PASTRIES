@@ -226,4 +226,55 @@ router.delete('/admin/articles/:id', authenticate, authorize('ADMIN', 'SUPER_ADM
   }
 });
 
+// ─── ADMIN: KB CATEGORY MANAGEMENT ─────────────────────────
+
+// POST /api/kb/categories — create a new KB category
+router.post('/categories', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { name, slug, isPublic, sortOrder } = req.body;
+    if (!name) throw new AppError('Category name is required', 400);
+
+    const finalSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    const category = await prisma.kbCategory.create({
+      data: {
+        name,
+        slug: finalSlug,
+        isPublic: isPublic !== undefined ? isPublic : true,
+        sortOrder: sortOrder || 0,
+      },
+    });
+
+    res.status(201).json({ success: true, data: category });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/kb/categories/:id — update a KB category
+router.put('/categories/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, isPublic, sortOrder } = req.body;
+
+    const existing = await prisma.kbCategory.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Category not found', 404);
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+
+    const category = await prisma.kbCategory.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({ success: true, data: category });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

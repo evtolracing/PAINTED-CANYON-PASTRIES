@@ -59,7 +59,17 @@ const AdminOrderDetail = () => {
     }
   };
 
-  useEffect(() => { fetchOrder(); }, [id]);
+  const fetchBakers = async () => {
+    try {
+      const { data } = await api.get('/auth/users');
+      const bakerRoles = ['BAKER', 'MANAGER', 'ADMIN', 'SUPER_ADMIN'];
+      setBakers((data.data || []).filter(u => bakerRoles.includes(u.role) && u.isActive));
+    } catch {
+      setBakers([]);
+    }
+  };
+
+  useEffect(() => { fetchOrder(); fetchBakers(); }, [id]);
 
   const advanceStatus = async () => {
     if (!order) return;

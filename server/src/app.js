@@ -30,6 +30,7 @@ const posRoutes = require('./routes/pos.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const newsletterRoutes = require('./routes/newsletter.routes');
 const cateringRoutes = require('./routes/catering.routes');
+const contactRoutes = require('./routes/contact.routes');
 
 const app = express();
 
@@ -89,6 +90,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/catering', cateringRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

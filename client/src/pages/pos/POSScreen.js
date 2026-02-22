@@ -379,7 +379,7 @@ const POSScreen = () => {
                         width: '100%',
                         aspectRatio: '1',
                         borderRadius: 1.5,
-                        bgcolor: 'sandstone.50',
+                        bgcolor: '#faf7f2',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

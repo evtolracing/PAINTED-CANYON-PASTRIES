@@ -92,10 +92,10 @@ const AdminKnowledgeBase = () => {
         sortOrder: parseInt(form.sortOrder) || 0,
       };
       if (editing) {
-        await api.put(`/kb/${editing.id}`, payload);
+        await api.put(`/kb/admin/articles/${editing.id}`, payload);
         showSnackbar('Article updated', 'success');
       } else {
-        await api.post('/kb', payload);
+        await api.post('/kb/admin/articles', payload);
         showSnackbar('Article created', 'success');
       }
       setDialogOpen(false);
@@ -110,7 +110,7 @@ const AdminKnowledgeBase = () => {
   const handleDelete = async () => {
     if (!deleteDialog.article) return;
     try {
-      await api.delete(`/kb/${deleteDialog.article.id}`);
+      await api.delete(`/kb/admin/articles/${deleteDialog.article.id}`);
       showSnackbar('Article deleted', 'success');
       setDeleteDialog({ open: false, article: null });
       fetchData();

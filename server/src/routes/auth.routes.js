@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const authService = require('../services/auth.service');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { registerSchema, loginSchema } = require('../validators/auth.validator');
@@ -154,6 +154,63 @@ router.delete('/avatar', authenticate, async (req, res, next) => {
       select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true, avatar: true },
     });
     res.json({ success: true, data: { user } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ─── ADMIN USER MANAGEMENT ─────────────────────────────────
+
+// GET /api/auth/users — list all users (admin only)
+router.get('/users', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, avatar: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: users });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/invite — create/invite a new staff user (admin only)
+router.post('/invite', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const { email, firstName, lastName, role, pin } = req.body;
+
+    if (!email || !firstName || !lastName) {
+      return res.status(400).json({ success: false, message: 'Email, first name, and last name are required' });
+    }
+
+    const validRoles = ['BAKER', 'CASHIER', 'MANAGER', 'ADMIN'];
+    const assignedRole = validRoles.includes(role) ? role : 'BAKER';
+
+    // Check for existing user
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'A user with this email already exists' });
+    }
+
+    // Generate a temporary password
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        firstName,
+        lastName,
+        passwordHash,
+        role: assignedRole,
+        pin: pin || null,
+        isActive: true,
+      },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, createdAt: true },
+    });
+
+    res.status(201).json({ success: true, data: user, tempPassword });
   } catch (error) {
     next(error);
   }

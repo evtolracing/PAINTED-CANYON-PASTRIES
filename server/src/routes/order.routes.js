@@ -16,15 +16,22 @@ async function generateOrderNumber(tx) {
   const db = tx || prisma;
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-  const count = await db.order.count({
-    where: {
-      createdAt: {
-        gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-        lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
-      },
-    },
+  const prefix = `PCP-${dateStr}-`;
+
+  // Find the highest existing order number for today to avoid duplicates
+  const lastOrder = await db.order.findFirst({
+    where: { orderNumber: { startsWith: prefix } },
+    orderBy: { orderNumber: 'desc' },
+    select: { orderNumber: true },
   });
-  return `PCP-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+
+  let nextNum = 1;
+  if (lastOrder) {
+    const lastNum = parseInt(lastOrder.orderNumber.split('-').pop(), 10);
+    if (!isNaN(lastNum)) nextNum = lastNum + 1;
+  }
+
+  return `${prefix}${String(nextNum).padStart(4, '0')}`;
 }
 
 // ─── CREATE ORDER ─────────────────────────────────────────
@@ -136,15 +143,30 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
     // ── Customer linkage ──
     let customerId = null;
     if (req.user) {
-      const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
-      if (customer) customerId = customer.id;
+      let customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+      if (!customer) {
+        // Auto-create customer record for registered users who don't have one
+        customer = await prisma.customer.create({
+          data: {
+            userId: req.user.id,
+            email: req.user.email,
+            firstName: req.user.firstName || '',
+            lastName: req.user.lastName || '',
+            phone: req.user.phone || null,
+          },
+        });
+      }
+      customerId = customer.id;
     }
 
     // ── Stripe payment intent ──
     let stripePaymentId = null;
     let clientSecret = null;
     const effectivePayment = paymentMethod || 'STRIPE_CARD';
-    if (effectivePayment === 'STRIPE_CARD' && totalAmount > 0) {
+    const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+    const stripeConfigured = stripeKey && !stripeKey.includes('placeholder') && stripeKey.startsWith('sk_');
+
+    if (effectivePayment === 'STRIPE_CARD' && totalAmount > 0 && stripeConfigured) {
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalAmount * 100), // cents
@@ -156,7 +178,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
       } catch (stripeErr) {
         throw new AppError(`Payment processing failed: ${stripeErr.message}`, 502);
       }
-    } else if (effectivePayment === 'STRIPE_TERMINAL' && totalAmount > 0) {
+    } else if (effectivePayment === 'STRIPE_TERMINAL' && totalAmount > 0 && stripeConfigured) {
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalAmount * 100),
@@ -174,6 +196,8 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
 
     // ── Create order in a transaction ──
     const isCashOrComp = effectivePayment === 'CASH' || effectivePayment === 'COMP';
+    const skipStripe = !stripeConfigured && (effectivePayment === 'STRIPE_CARD' || effectivePayment === 'STRIPE_TERMINAL');
+    const autoConfirm = isCashOrComp || skipStripe;
     const orderSrc = source || 'web';
 
     const result = await prisma.$transaction(async (tx) => {
@@ -183,7 +207,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
         data: {
           orderNumber,
           customerId,
-          status: isCashOrComp ? 'CONFIRMED' : 'NEW',
+          status: autoConfirm ? 'CONFIRMED' : 'NEW',
           fulfillmentType,
           subtotal,
           taxAmount,
@@ -193,8 +217,8 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
           totalAmount,
           paymentMethod: effectivePayment,
           stripePaymentId,
-          isPaid: isCashOrComp,
-          paidAt: isCashOrComp ? new Date() : null,
+          isPaid: autoConfirm,
+          paidAt: autoConfirm ? new Date() : null,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
           timeslotId: timeslotId || null,
           scheduledSlot: timeslotId ? undefined : null,

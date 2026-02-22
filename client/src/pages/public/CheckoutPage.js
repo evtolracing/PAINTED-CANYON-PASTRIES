@@ -121,7 +121,7 @@ const CheckoutPage = () => {
         setZipError('');
       }
     }
-    if (activeStep === 1 && !selectedSlot) {
+    if (activeStep === 1 && !selectedSlot && timeslots.length > 0) {
       showSnackbar('Please select a time slot.', 'error');
       return false;
     }
@@ -287,7 +287,7 @@ const CheckoutPage = () => {
                   ))}
                 </Stack>
               ) : timeslots.length === 0 ? (
-                <Alert severity="warning">No time slots available right now. Please check back later.</Alert>
+                <Alert severity="info">No scheduled time slots available. Your order will be processed as soon as possible.</Alert>
               ) : (
                 <RadioGroup value={selectedSlot?.id || ''} onChange={(e) => {
                   const slot = timeslots.find((s) => String(s.id) === e.target.value);

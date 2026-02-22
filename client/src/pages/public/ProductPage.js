@@ -220,15 +220,15 @@ const ProductPage = () => {
               )}
 
               {/* Allergens */}
-              {product.allergens?.length > 0 && (
+              {product.allergenTags?.length > 0 && (
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Allergens</Typography>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {product.allergens.map((allergen, idx) => (
+                    {product.allergenTags.map((tag, idx) => (
                       <Chip
                         key={idx}
                         icon={<Warning sx={{ fontSize: 16 }} />}
-                        label={typeof allergen === 'string' ? allergen : allergen.name}
+                        label={tag.allergen?.name || tag.name || 'Allergen'}
                         size="small"
                         variant="outlined"
                         color="warning"

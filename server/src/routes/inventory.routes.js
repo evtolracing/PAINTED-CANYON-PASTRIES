@@ -24,11 +24,8 @@ router.get('/', authenticate, authorize(...ADMIN_ROLES, 'BAKER'), async (req, re
     }
 
     // Low stock filter: items at or below reorder threshold
-    if (lowStock === 'true') {
-      where.currentStock = { lte: prisma.inventoryItem.fields?.reorderThreshold };
-      // Prisma doesn't support column comparison directly; use raw or post-filter
-      // We'll post-filter instead
-    }
+    // Prisma doesn't support column-to-column comparison, so we post-filter below
+    const doLowStockFilter = lowStock === 'true';
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
@@ -44,7 +41,7 @@ router.get('/', authenticate, authorize(...ADMIN_ROLES, 'BAKER'), async (req, re
     ]);
 
     // Post-filter for low stock
-    if (lowStock === 'true') {
+    if (doLowStockFilter) {
       items = items.filter((i) => parseFloat(i.currentStock) <= parseFloat(i.reorderThreshold));
       total = items.length;
     }

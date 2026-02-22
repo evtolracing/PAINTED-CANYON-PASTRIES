@@ -50,14 +50,7 @@ const PublicLayout = () => {
                 gap: 1.5,
               }}
             >
-              {user?.avatar ? (
-                <Avatar
-                  src={`${API_HOST}${user.avatar}`}
-                  sx={{ width: 32, height: 32 }}
-                />
-              ) : (
-                <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 28 }} />
-              )}
+              <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 28 }} />
               <Box>
                 <Typography
                   variant="h6"

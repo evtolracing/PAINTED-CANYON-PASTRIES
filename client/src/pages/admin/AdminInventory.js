@@ -50,7 +50,7 @@ const AdminInventory = () => {
 
   const fetchPOs = async () => {
     try {
-      const { data } = await api.get('/inventory/purchase-orders');
+      const { data } = await api.get('/inventory/purchase-orders/list');
       setPurchaseOrders(data.data || []);
     } catch (err) {
       // PO endpoint might not exist yet

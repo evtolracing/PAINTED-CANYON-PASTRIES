@@ -65,7 +65,7 @@ const AdminCustomers = () => {
   const addTag = async () => {
     if (!newTag.trim()) return;
     try {
-      await api.put(`/customers/${tagDialog.customerId}/tags`, { tag: newTag.trim() });
+      await api.post(`/customers/${tagDialog.customerId}/tags`, { tag: newTag.trim() });
       showSnackbar('Tag added', 'success');
       setTagDialog({ open: false, customerId: null });
       setNewTag('');
@@ -79,7 +79,7 @@ const AdminCustomers = () => {
   const addCredit = async () => {
     if (!creditAmount) return;
     try {
-      await api.put(`/customers/${creditDialog.customerId}/credit`, { amount: parseFloat(creditAmount) });
+      await api.post(`/customers/${creditDialog.customerId}/credit`, { amount: parseFloat(creditAmount) });
       showSnackbar('Credit added', 'success');
       setCreditDialog({ open: false, customerId: null });
       setCreditAmount('');

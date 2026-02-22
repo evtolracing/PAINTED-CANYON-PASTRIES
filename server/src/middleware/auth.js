@@ -79,7 +79,7 @@ const authenticatePin = async (req, res, next) => {
       where: {
         pin,
         isActive: true,
-        role: { in: ['CASHIER', 'MANAGER', 'ADMIN', 'SUPER_ADMIN'] },
+        role: { in: ['CASHIER', 'MANAGER', 'ADMIN', 'SUPER_ADMIN', 'BAKER'] },
       },
       select: { id: true, email: true, firstName: true, lastName: true, phone: true, role: true, avatar: true },
     });
