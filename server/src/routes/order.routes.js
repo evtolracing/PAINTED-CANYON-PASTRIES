@@ -12,10 +12,11 @@ const { createOrderSchema, updateOrderStatusSchema } = require('../validators/or
 const TAX_RATE = 0.0825; // 8.25% — configurable via settings in prod
 const DELIVERY_FEE = 5.00;
 
-async function generateOrderNumber() {
+async function generateOrderNumber(tx) {
+  const db = tx || prisma;
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-  const count = await prisma.order.count({
+  const count = await db.order.count({
     where: {
       createdAt: {
         gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
@@ -35,7 +36,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
       deliveryAddress, deliveryZip, deliveryNotes,
       paymentMethod, tipAmount, promoCode,
       guestEmail, guestFirstName, guestLastName, guestPhone,
-      productionNotes, source,
+      productionNotes, source, isManualEntry,
     } = req.body;
 
     // ── Resolve line items & calculate prices ──
@@ -70,12 +71,16 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
       const addonData = [];
       if (item.addons?.length) {
         for (const addonReq of item.addons) {
-          const addon = product.addons.find((a) => a.id === addonReq.addonId && a.isActive);
+          // Support both { addonId } and plain string ID
+          const addonId = typeof addonReq === 'string' ? addonReq : addonReq.addonId;
+          const addonValue = typeof addonReq === 'string' ? null : (addonReq.value || null);
+
+          const addon = product.addons.find((a) => a.id === addonId && a.isActive);
           // Also check global addons
           const globalAddon = addon || await prisma.productAddon.findFirst({
-            where: { id: addonReq.addonId, isGlobal: true, isActive: true },
+            where: { id: addonId, isGlobal: true, isActive: true },
           });
-          if (!globalAddon) throw new AppError(`Addon ${addonReq.addonId} not found`, 400);
+          if (!globalAddon) throw new AppError(`Addon ${addonId} not found`, 400);
 
           const addonPrice = parseFloat(globalAddon.price);
           subtotal += addonPrice * item.quantity;
@@ -83,7 +88,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
           addonData.push({
             addonId: globalAddon.id,
             price: addonPrice,
-            value: addonReq.value || null,
+            value: addonValue,
           });
         }
       }
@@ -138,70 +143,98 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
     // ── Stripe payment intent ──
     let stripePaymentId = null;
     let clientSecret = null;
-    if (paymentMethod === 'STRIPE_CARD' && totalAmount > 0) {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(totalAmount * 100), // cents
-        currency: 'usd',
-        metadata: { source: source || 'web' },
-      });
-      stripePaymentId = paymentIntent.id;
-      clientSecret = paymentIntent.client_secret;
+    const effectivePayment = paymentMethod || 'STRIPE_CARD';
+    if (effectivePayment === 'STRIPE_CARD' && totalAmount > 0) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(totalAmount * 100), // cents
+          currency: 'usd',
+          metadata: { source: source || 'web' },
+        });
+        stripePaymentId = paymentIntent.id;
+        clientSecret = paymentIntent.client_secret;
+      } catch (stripeErr) {
+        throw new AppError(`Payment processing failed: ${stripeErr.message}`, 502);
+      }
+    } else if (effectivePayment === 'STRIPE_TERMINAL' && totalAmount > 0) {
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(totalAmount * 100),
+          currency: 'usd',
+          payment_method_types: ['card_present'],
+          capture_method: 'automatic',
+          metadata: { source: source || 'pos' },
+        });
+        stripePaymentId = paymentIntent.id;
+        clientSecret = paymentIntent.client_secret;
+      } catch (stripeErr) {
+        throw new AppError(`Terminal payment failed: ${stripeErr.message}`, 502);
+      }
     }
 
-    // ── Create order ──
-    const orderNumber = await generateOrderNumber();
+    // ── Create order in a transaction ──
+    const isCashOrComp = effectivePayment === 'CASH' || effectivePayment === 'COMP';
+    const orderSrc = source || 'web';
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        customerId,
-        status: 'NEW',
-        fulfillmentType,
-        subtotal,
-        taxAmount,
-        deliveryFee,
-        tipAmount: tipAmount || 0,
-        discountAmount,
-        totalAmount,
-        paymentMethod: paymentMethod || 'STRIPE_CARD',
-        stripePaymentId,
-        isPaid: paymentMethod === 'CASH' || paymentMethod === 'COMP',
-        paidAt: paymentMethod === 'CASH' || paymentMethod === 'COMP' ? new Date() : null,
-        scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
-        timeslotId: timeslotId || null,
-        deliveryAddress,
-        deliveryZip,
-        deliveryNotes,
-        productionNotes,
-        source: source || 'web',
-        guestEmail,
-        guestFirstName,
-        guestLastName,
-        guestPhone,
-        items: { create: orderItemsData },
-      },
-      include: {
-        items: { include: { product: true, variant: true, addons: { include: { addon: true } } } },
-        customer: true,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const orderNumber = await generateOrderNumber(tx);
+
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          customerId,
+          status: isCashOrComp ? 'CONFIRMED' : 'NEW',
+          fulfillmentType,
+          subtotal,
+          taxAmount,
+          deliveryFee,
+          tipAmount: tipAmount || 0,
+          discountAmount,
+          totalAmount,
+          paymentMethod: effectivePayment,
+          stripePaymentId,
+          isPaid: isCashOrComp,
+          paidAt: isCashOrComp ? new Date() : null,
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
+          timeslotId: timeslotId || null,
+          scheduledSlot: timeslotId ? undefined : null,
+          deliveryAddress: deliveryAddress || null,
+          deliveryZip: deliveryZip || null,
+          deliveryNotes: deliveryNotes || null,
+          productionNotes: productionNotes || null,
+          isManualEntry: isManualEntry || orderSrc === 'pos',
+          source: orderSrc,
+          guestEmail: guestEmail || null,
+          guestFirstName: guestFirstName || null,
+          guestLastName: guestLastName || null,
+          guestPhone: guestPhone || null,
+          items: { create: orderItemsData },
+        },
+        include: {
+          items: { include: { product: true, variant: true, addons: { include: { addon: true } } } },
+          customer: true,
+        },
+      });
+
+      // ── Update promo usage ──
+      if (promoId) {
+        await tx.promo.update({ where: { id: promoId }, data: { usedCount: { increment: 1 } } });
+        await tx.promoRedemption.create({
+          data: { promoId, orderId: order.id, customerId, amount: discountAmount },
+        });
+      }
+
+      // ── Update timeslot count ──
+      if (timeslotId) {
+        await tx.timeslot.update({ where: { id: timeslotId }, data: { currentCount: { increment: 1 } } });
+      }
+
+      return order;
     });
-
-    // ── Update promo usage ──
-    if (promoId) {
-      await prisma.promo.update({ where: { id: promoId }, data: { usedCount: { increment: 1 } } });
-      await prisma.promoRedemption.create({
-        data: { promoId, orderId: order.id, customerId, amount: discountAmount },
-      });
-    }
-
-    // ── Update timeslot count ──
-    if (timeslotId) {
-      await prisma.timeslot.update({ where: { id: timeslotId }, data: { currentCount: { increment: 1 } } });
-    }
 
     res.status(201).json({
       success: true,
-      data: { order, clientSecret },
+      data: { order: result, clientSecret },
     });
   } catch (error) {
     next(error);
@@ -209,6 +242,71 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
 });
 
 // ─── GET ORDERS ───────────────────────────────────────────
+
+// GET /api/orders/my — customer's own orders (shortcut)
+router.get('/my', authenticate, async (req, res, next) => {
+  try {
+    const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+    if (!customer) return res.json({ success: true, data: [] });
+
+    const orders = await prisma.order.findMany({
+      where: { customerId: customer.id },
+      include: {
+        items: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, basePrice: true, images: { where: { isPrimary: true }, take: 1 } } },
+            variant: { select: { id: true, name: true, price: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    res.json({ success: true, data: orders });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/orders/by-number/:orderNumber — lookup by order number (for confirmation page)
+router.get('/by-number/:orderNumber', optionalAuth, async (req, res, next) => {
+  try {
+    const { orderNumber } = req.params;
+
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, images: { where: { isPrimary: true }, take: 1 } } },
+            variant: { select: { id: true, name: true } },
+            addons: { include: { addon: { select: { id: true, name: true } } } },
+          },
+        },
+        timeslot: true,
+      },
+    });
+
+    if (!order) throw new AppError('Order not found', 404);
+
+    // If authenticated, verify it's their order or they're admin
+    if (req.user) {
+      const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'BAKER'].includes(req.user.role);
+      if (!isAdmin) {
+        const customer = await prisma.customer.findUnique({ where: { userId: req.user.id } });
+        if (customer && order.customerId && order.customerId !== customer.id) {
+          throw new AppError('Order not found', 404);
+        }
+      }
+    }
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/orders — admin: all, customer: own
 router.get('/', authenticate, async (req, res, next) => {

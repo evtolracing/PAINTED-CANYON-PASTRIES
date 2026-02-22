@@ -9,7 +9,7 @@ import {
 import api from '../../services/api';
 
 const OrderConfirmationPage = () => {
-  const { orderNumber } = useParams();
+  const { orderId: orderNumber } = useParams();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -103,7 +103,7 @@ const OrderConfirmationPage = () => {
                           {item.variant && ` (${item.variant.name || item.variantName})`}
                         </Typography>
                         <Typography variant="body2" fontWeight={600}>
-                          ${Number(item.lineTotal || item.unitPrice * item.quantity || 0).toFixed(2)}
+                          ${Number(item.totalPrice || item.unitPrice * item.quantity || 0).toFixed(2)}
                         </Typography>
                       </Stack>
                     ))}
@@ -116,7 +116,7 @@ const OrderConfirmationPage = () => {
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="h6">Total</Typography>
                   <Typography variant="h6" color="primary.main" fontWeight={700}>
-                    ${Number(order.total || 0).toFixed(2)}
+                    ${Number(order.totalAmount || 0).toFixed(2)}
                   </Typography>
                 </Stack>
 
@@ -125,19 +125,19 @@ const OrderConfirmationPage = () => {
                 {/* Fulfillment */}
                 <Box>
                   <Chip
-                    label={order.fulfillmentType === 'DELIVERY' ? 'Delivery' : 'Pickup'}
+                    label={order.fulfillmentType === 'DELIVERY' ? 'Delivery' : order.fulfillmentType === 'WALKIN' ? 'Walk-In' : 'Pickup'}
                     color="primary"
                     size="small"
                     sx={{ mb: 1 }}
                   />
                   {order.fulfillmentType === 'DELIVERY' && order.deliveryAddress && (
                     <Typography variant="body2" color="text.secondary">
-                      {order.deliveryAddress.street}, {order.deliveryAddress.city}, {order.deliveryAddress.state} {order.deliveryAddress.zip}
+                      {order.deliveryAddress}{order.deliveryZip ? ` ${order.deliveryZip}` : ''}
                     </Typography>
                   )}
                   {order.timeslot && (
                     <Typography variant="body2" color="text.secondary">
-                      {order.timeslot.date || order.timeslot.label} — {order.timeslot.startTime} to {order.timeslot.endTime}
+                      {order.timeslot.date ? new Date(order.timeslot.date).toLocaleDateString() : order.timeslot.label} — {order.timeslot.startTime} to {order.timeslot.endTime}
                     </Typography>
                   )}
                 </Box>

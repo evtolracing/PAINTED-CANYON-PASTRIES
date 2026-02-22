@@ -7,10 +7,15 @@ const createOrderSchema = Joi.object({
     variantId: Joi.string().uuid().allow(null),
     quantity: Joi.number().integer().min(1).required(),
     notes: Joi.string().max(500).allow('', null),
-    addons: Joi.array().items(Joi.object({
-      addonId: Joi.string().uuid().required(),
-      value: Joi.string().max(500).allow('', null),
-    })).default([]),
+    addons: Joi.array().items(
+      Joi.alternatives().try(
+        Joi.object({
+          addonId: Joi.string().uuid().required(),
+          value: Joi.string().max(500).allow('', null),
+        }),
+        Joi.string().uuid()
+      )
+    ).default([]),
   })).min(1).required(),
 
   // Scheduling
@@ -18,7 +23,8 @@ const createOrderSchema = Joi.object({
   timeslotId: Joi.string().uuid().allow(null),
 
   // Delivery
-  deliveryAddress: Joi.string().max(500).allow('', null),
+  deliveryAddress: Joi.string().max(500).allow('', null)
+    .when('fulfillmentType', { is: 'DELIVERY', then: Joi.string().min(1).required() }),
   deliveryZip: Joi.string().max(10).allow('', null),
   deliveryNotes: Joi.string().max(500).allow('', null),
 
@@ -39,6 +45,7 @@ const createOrderSchema = Joi.object({
   // Internal
   productionNotes: Joi.string().max(1000).allow('', null),
   source: Joi.string().valid('web', 'pos', 'phone').default('web'),
+  isManualEntry: Joi.boolean().default(false),
 });
 
 const updateOrderStatusSchema = Joi.object({

@@ -14,12 +14,13 @@ import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
 
 const statusColors = {
-  PENDING: 'warning',
+  NEW: 'info',
   CONFIRMED: 'info',
-  PREPARING: 'info',
+  IN_PRODUCTION: 'warning',
   READY: 'success',
-  DELIVERED: 'success',
+  OUT_FOR_DELIVERY: 'info',
   COMPLETED: 'success',
+  REFUNDED: 'error',
   CANCELLED: 'error',
 };
 
@@ -121,7 +122,7 @@ const OrderHistoryPage = () => {
                   <Divider sx={{ my: 1.5 }} />
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Typography variant="h6" color="primary.main" fontWeight={700}>
-                      ${Number(order.total || 0).toFixed(2)}
+                      ${Number(order.totalAmount || 0).toFixed(2)}
                     </Typography>
                     <Button
                       size="small"
@@ -182,7 +183,7 @@ const OrderHistoryPage = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="subtitle2" fontWeight={700} color="primary.main">
-                        ${Number(order.total || 0).toFixed(2)}
+                        ${Number(order.totalAmount || 0).toFixed(2)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">

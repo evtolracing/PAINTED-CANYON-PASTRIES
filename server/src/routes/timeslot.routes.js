@@ -25,7 +25,8 @@ router.get('/', async (req, res, next) => {
     }
 
     if (type) {
-      where.type = type;
+      // Accept both lowercase and uppercase
+      where.type = type.toUpperCase();
     }
 
     const timeslots = await prisma.timeslot.findMany({
@@ -34,13 +35,58 @@ router.get('/', async (req, res, next) => {
     });
 
     // Add availability info
-    const slotsWithAvailability = timeslots.map((slot) => ({
-      ...slot,
-      availableCapacity: slot.maxCapacity - slot.currentCount,
-      isFull: slot.currentCount >= slot.maxCapacity,
-    }));
+    const slotsWithAvailability = timeslots
+      .filter((slot) => slot.currentCount < slot.maxCapacity)
+      .map((slot) => ({
+        ...slot,
+        availableCapacity: slot.maxCapacity - slot.currentCount,
+        spotsLeft: slot.maxCapacity - slot.currentCount,
+        isFull: false,
+      }));
 
     res.json({ success: true, data: slotsWithAvailability });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/timeslots/available — alias for front-end compatibility
+router.get('/available', async (req, res, next) => {
+  try {
+    const { type, date, days = 7 } = req.query;
+
+    const where = { isBlocked: false };
+
+    if (date) {
+      where.date = new Date(date);
+    } else {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + parseInt(days));
+      where.date = { gte: start, lt: end };
+    }
+
+    if (type) {
+      where.type = type.toUpperCase();
+    }
+
+    const timeslots = await prisma.timeslot.findMany({
+      where,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+
+    const available = timeslots
+      .filter((slot) => slot.currentCount < slot.maxCapacity)
+      .map((slot) => ({
+        ...slot,
+        date: slot.date.toISOString().slice(0, 10),
+        availableCapacity: slot.maxCapacity - slot.currentCount,
+        spotsLeft: slot.maxCapacity - slot.currentCount,
+        isFull: false,
+      }));
+
+    res.json({ success: true, data: available });
   } catch (error) {
     next(error);
   }

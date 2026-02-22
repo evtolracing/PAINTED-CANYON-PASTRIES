@@ -33,8 +33,13 @@ export const CartProvider = ({ children }) => {
 
   const addItem = useCallback((product, variant = null, quantity = 1, addons = [], notes = '') => {
     setItems((prev) => {
+      // Build a key that includes addons so different addon combos are separate line items
+      const addonKey = (addons || []).map((a) => a.id || a.addonId || a).sort().join(',');
       const existingIndex = prev.findIndex(
-        (item) => item.product.id === product.id && item.variant?.id === variant?.id
+        (item) =>
+          item.product.id === product.id &&
+          item.variant?.id === variant?.id &&
+          ((item.addons || []).map((a) => a.id || a.addonId || a).sort().join(',') === addonKey)
       );
 
       let newItems;
@@ -45,6 +50,8 @@ export const CartProvider = ({ children }) => {
           quantity: newItems[existingIndex].quantity + quantity,
         };
       } else {
+        // Calculate addon cost per unit
+        const addonTotal = (addons || []).reduce((sum, a) => sum + (Number(a.price) || 0), 0);
         newItems = [...prev, {
           id: `${product.id}-${variant?.id || 'base'}-${Date.now()}`,
           product,
@@ -52,7 +59,8 @@ export const CartProvider = ({ children }) => {
           quantity,
           addons,
           notes,
-          unitPrice: variant ? Number(variant.price) : Number(product.basePrice),
+          unitPrice: (variant ? Number(variant.price) : Number(product.basePrice)) + addonTotal,
+          addonTotal,
         }];
       }
 

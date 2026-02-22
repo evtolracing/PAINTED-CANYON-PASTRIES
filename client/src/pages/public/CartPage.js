@@ -22,7 +22,7 @@ const CartPage = () => {
     if (!promoCode.trim()) return;
     setPromoLoading(true);
     try {
-      const { data } = await api.post('/promo/validate', { code: promoCode });
+      const { data } = await api.post('/promos/validate', { code: promoCode, subtotal });
       setDiscount(data.data || data);
       showSnackbar('Promo code applied!', 'success');
     } catch {
@@ -34,9 +34,9 @@ const CartPage = () => {
   };
 
   const discountAmount = discount
-    ? discount.type === 'PERCENT'
-      ? subtotal * (discount.value / 100)
-      : Number(discount.value)
+    ? discount.discount || (discount.type === 'PERCENTAGE'
+      ? subtotal * (Number(discount.value) / 100)
+      : Number(discount.value))
     : 0;
 
   const total = Math.max(0, subtotal - discountAmount);
@@ -167,11 +167,14 @@ const CartPage = () => {
                 <Divider />
 
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography variant="h6">Total</Typography>
+                  <Typography variant="h6">Estimated Total</Typography>
                   <Typography variant="h6" color="primary.main" fontWeight={700}>
                     ${total.toFixed(2)}
                   </Typography>
                 </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  Tax and delivery fee calculated at checkout
+                </Typography>
               </Stack>
 
               {/* Promo Code */}

@@ -3,7 +3,7 @@ import {
   Box, Grid, Typography, Button, Paper, TextField, IconButton, Chip,
   Stack, Dialog, DialogTitle, DialogContent, DialogActions, Avatar,
   Divider, ToggleButton, ToggleButtonGroup, InputAdornment, List,
-  ListItem, ListItemText, ListItemSecondaryAction, Badge, CircularProgress
+  ListItem, CircularProgress
 } from '@mui/material';
 import {
   Search, Add, Remove, Delete, LocalShipping, StorefrontOutlined,
@@ -30,6 +30,8 @@ const POSScreen = () => {
   const [fulfillment, setFulfillment] = useState('WALKIN');
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [promoError, setPromoError] = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
 
   // Payment state
   const [paymentDialog, setPaymentDialog] = useState(false);
@@ -66,6 +68,8 @@ const POSScreen = () => {
     try {
       setPinError('');
       const { data } = await api.post('/pos/pin-login', { pin });
+      // Store the POS token so api.js interceptor attaches it
+      localStorage.setItem('accessToken', data.data.token);
       setStaffUser(data.data.user);
       setAuthenticated(true);
     } catch {
@@ -120,13 +124,33 @@ const POSScreen = () => {
     setCartItems([]);
     setPromoCode('');
     setDiscount(0);
+    setPromoError('');
+    setPromoApplied(false);
+  };
+
+  // Promo validation
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    try {
+      setPromoError('');
+      const { data } = await api.post('/promos/validate', { code: promoCode, subtotal });
+      setDiscount(data.data.discount || 0);
+      setPromoApplied(true);
+    } catch (err) {
+      setPromoError(err.response?.data?.error?.message || 'Invalid promo code');
+      setDiscount(0);
+      setPromoApplied(false);
+    }
   };
 
   // Calculations
   const subtotal = cartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const taxRate = 0.0775; // CA tax
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax - discount;
+  const taxRate = 0.0825; // Match server tax rate
+  const DELIVERY_FEE = 5.0;
+  const deliveryFee = fulfillment === 'DELIVERY' ? DELIVERY_FEE : 0;
+  const taxableAmount = subtotal - discount;
+  const tax = Math.round(taxableAmount * taxRate * 100) / 100;
+  const total = Math.round((taxableAmount + tax + deliveryFee) * 100) / 100;
   const changeDue = cashTendered ? Math.max(0, Number(cashTendered) - total) : 0;
 
   // Place order
@@ -136,7 +160,6 @@ const POSScreen = () => {
       const orderData = {
         fulfillmentType: fulfillment,
         paymentMethod,
-        source: 'pos',
         items: cartItems.map((item) => ({
           productId: item.product.id,
           variantId: item.variant?.id || null,
@@ -148,11 +171,12 @@ const POSScreen = () => {
 
       if (promoCode) orderData.promoCode = promoCode;
 
-      const { data } = await api.post('/orders', orderData);
+      const { data } = await api.post('/pos/orders', orderData);
       setOrderComplete(data.data);
       clearCart();
     } catch (error) {
-      console.error('Order failed:', error);
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || 'Order failed. Please try again.';
+      alert(msg);
     } finally {
       setProcessing(false);
       setPaymentDialog(false);
@@ -448,13 +472,27 @@ const POSScreen = () => {
 
         {/* Promo Code */}
         <Box sx={{ px: 2, py: 1 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Promo code"
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value)}
-          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Promo code"
+              value={promoCode}
+              onChange={(e) => { setPromoCode(e.target.value); setPromoApplied(false); }}
+              error={!!promoError}
+              helperText={promoError || (promoApplied ? `Discount: -$${discount.toFixed(2)}` : '')}
+              disabled={promoApplied}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={promoApplied ? () => { setPromoCode(''); setDiscount(0); setPromoApplied(false); setPromoError(''); } : handleApplyPromo}
+              disabled={!promoCode.trim() && !promoApplied}
+              sx={{ minWidth: 72 }}
+            >
+              {promoApplied ? 'Clear' : 'Apply'}
+            </Button>
+          </Stack>
         </Box>
 
         {/* Totals */}
@@ -464,14 +502,20 @@ const POSScreen = () => {
               <Typography variant="body2">Subtotal</Typography>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>${subtotal.toFixed(2)}</Typography>
             </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="body2">Tax (7.75%)</Typography>
-              <Typography variant="body2">${tax.toFixed(2)}</Typography>
-            </Box>
             {discount > 0 && (
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2" color="success.main">Discount</Typography>
                 <Typography variant="body2" color="success.main">-${discount.toFixed(2)}</Typography>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2">Tax (8.25%)</Typography>
+              <Typography variant="body2">${tax.toFixed(2)}</Typography>
+            </Box>
+            {deliveryFee > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2">Delivery Fee</Typography>
+                <Typography variant="body2">${deliveryFee.toFixed(2)}</Typography>
               </Box>
             )}
             <Divider />
@@ -561,7 +605,7 @@ const POSScreen = () => {
                     ${amount}
                   </Button>
                 ))}
-                <Button variant="outlined" size="small" onClick={() => setCashTendered(Math.ceil(total).toString())}>
+                <Button variant="outlined" size="small" onClick={() => setCashTendered(total.toFixed(2))}>
                   Exact
                 </Button>
               </Stack>
