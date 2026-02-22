@@ -38,6 +38,7 @@ const AdminProductEdit = () => {
   const [selectedAllergens, setSelectedAllergens] = useState([]);
   const [productImages, setProductImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const imageInputRef = useRef(null);
 
   useEffect(() => {
@@ -109,7 +110,20 @@ const AdminProductEdit = () => {
 
   const handleImageUpload = async (e) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || isNew) return;
+    if (!files || files.length === 0) return;
+
+    // If new product, stage files for upload after save
+    if (isNew) {
+      const fileArray = Array.from(files).map(f => ({
+        file: f,
+        preview: URL.createObjectURL(f),
+        name: f.name,
+      }));
+      setPendingFiles(prev => [...prev, ...fileArray]);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      return;
+    }
+
     const formData = new FormData();
     for (let i = 0; i < files.length; i++) {
       formData.append('images', files[i]);
@@ -127,6 +141,14 @@ const AdminProductEdit = () => {
       setUploadingImages(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
+  };
+
+  const removePendingFile = (index) => {
+    setPendingFiles(prev => {
+      const removed = prev[index];
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSetPrimary = async (imageId) => {
@@ -171,17 +193,36 @@ const AdminProductEdit = () => {
           ...(a.isNew ? {} : { id: a.id }),
           name: a.name, price: parseFloat(a.price) || 0, isActive: a.isActive,
         })),
-        allergenIds: selectedAllergens,
+        allergenIds: selectedAllergens.map(id => ({ allergenId: id, severity: 'contains' })),
       };
 
       if (isNew) {
-        await api.post('/products', payload);
+        const { data } = await api.post('/products', payload);
+        const newProductId = data.data?.id;
+
+        // Upload any staged images
+        if (newProductId && pendingFiles.length > 0) {
+          const imgFormData = new FormData();
+          pendingFiles.forEach(pf => imgFormData.append('images', pf.file));
+          try {
+            await api.post(`/products/${newProductId}/images`, imgFormData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          } catch {
+            showSnackbar('Product created but some images failed to upload', 'warning');
+          }
+          // Clean up preview URLs
+          pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+          setPendingFiles([]);
+        }
+
         showSnackbar('Product created!', 'success');
+        navigate(`/admin/products/${newProductId}/edit`);
       } else {
         await api.put(`/products/${id}`, payload);
         showSnackbar('Product updated!', 'success');
+        navigate('/admin/products');
       }
-      navigate('/admin/products');
     } catch (err) {
       showSnackbar(err.response?.data?.message || 'Failed to save product', 'error');
     } finally {
@@ -402,14 +443,33 @@ const AdminProductEdit = () => {
               </ImageList>
             )}
 
+            {/* Pending images (new product, not yet saved) */}
+            {pendingFiles.length > 0 && (
+              <ImageList cols={4} gap={8} sx={{ mb: 2 }}>
+                {pendingFiles.map((pf, idx) => (
+                  <ImageListItem key={idx} sx={{ borderRadius: 2, overflow: 'hidden', border: '1px dashed', borderColor: 'primary.main' }}>
+                    <img src={pf.preview} alt={pf.name} loading="lazy" style={{ height: 120, objectFit: 'cover' }} />
+                    <ImageListItemBar
+                      subtitle="Pending upload"
+                      sx={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
+                      actionIcon={
+                        <IconButton size="small" sx={{ color: 'white' }} onClick={() => removePendingFile(idx)} title="Remove">
+                          <Delete />
+                        </IconButton>
+                      }
+                    />
+                  </ImageListItem>
+                ))}
+              </ImageList>
+            )}
+
             {/* Upload area */}
             <Box
-              onClick={() => !isNew && imageInputRef.current?.click()}
+              onClick={() => imageInputRef.current?.click()}
               sx={{
                 border: '2px dashed', borderColor: 'divider', borderRadius: 2,
-                p: 4, textAlign: 'center', cursor: isNew ? 'not-allowed' : 'pointer',
-                opacity: isNew ? 0.5 : 1,
-                '&:hover': isNew ? {} : { borderColor: 'primary.main', bgcolor: 'rgba(196,149,106,0.04)' },
+                p: 4, textAlign: 'center', cursor: 'pointer',
+                '&:hover': { borderColor: 'primary.main', bgcolor: 'rgba(196,149,106,0.04)' },
               }}
             >
               {uploadingImages ? (
@@ -418,7 +478,7 @@ const AdminProductEdit = () => {
                 <>
                   <CloudUpload sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
                   <Typography variant="body2" color="text.secondary">
-                    {isNew ? 'Save the product first, then upload images' : 'Click to upload images'}
+                    {isNew ? 'Click to select images (will upload when saved)' : 'Click to upload images'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     Supports JPG, PNG, WebP up to 5MB

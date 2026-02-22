@@ -28,7 +28,7 @@ const ProductPage = () => {
     const fetchProduct = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/products/by-slug/${slug}`);
+        const { data } = await api.get(`/products/${slug}`);
         const prod = data.data || data;
         setProduct(prod);
         if (prod.variants?.length) setSelectedVariant(prod.variants[0]);

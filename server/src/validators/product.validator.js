@@ -22,15 +22,19 @@ const productSchema = Joi.object({
     severity: Joi.string().valid('contains', 'may_contain', 'facility').default('contains'),
   })),
   variants: Joi.array().items(Joi.object({
+    id: Joi.string().uuid().optional(),
     name: Joi.string().required(),
     type: Joi.string().valid('size', 'pack', 'flavor').required(),
-    price: Joi.number().positive().precision(2).required(),
+    price: Joi.number().min(0).precision(2).required(),
     sku: Joi.string().allow('', null),
     sortOrder: Joi.number().integer().default(0),
+    isActive: Joi.boolean().default(true),
   })),
   addons: Joi.array().items(Joi.object({
+    id: Joi.string().uuid().optional(),
     name: Joi.string().required(),
     price: Joi.number().min(0).precision(2).required(),
+    isActive: Joi.boolean().default(true),
     isGlobal: Joi.boolean().default(false),
   })),
 });
