@@ -9,7 +9,7 @@ import {
   Dashboard, ShoppingBag, Inventory2, Category, CalendarMonth,
   People, LocalOffer, MenuBook, BarChart, Settings, SmartToy,
   Menu as MenuIcon, Logout, ChevronLeft, StorefrontOutlined,
-  PointOfSale
+  PointOfSale, Restaurant
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,6 +27,7 @@ const menuItems = [
   { label: 'Customers', icon: <People />, path: '/admin/customers' },
   { label: 'Promotions', icon: <LocalOffer />, path: '/admin/promos' },
   { label: 'Knowledge Base', icon: <MenuBook />, path: '/admin/knowledge-base' },
+  { label: 'Recipes', icon: <Restaurant />, path: '/admin/recipes' },
   { divider: true },
   { label: 'Analytics', icon: <BarChart />, path: '/admin/analytics' },
   { label: 'AI Assistant', icon: <SmartToy />, path: '/admin/ai' },

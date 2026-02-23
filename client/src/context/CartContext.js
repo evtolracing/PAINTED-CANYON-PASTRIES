@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useAuth } from './AuthContext';
 
 const CartContext = createContext(null);
 
@@ -10,9 +11,19 @@ export const useCart = () => {
 
 const CART_KEY = 'pcp_cart';
 
+const isLoggedIn = () => !!localStorage.getItem('accessToken');
+
 const loadCart = () => {
   try {
-    const stored = localStorage.getItem(CART_KEY);
+    if (isLoggedIn()) {
+      // Authenticated: read from localStorage
+      const stored = localStorage.getItem(CART_KEY);
+      return stored ? JSON.parse(stored) : [];
+    }
+    // Guest: only use sessionStorage (dies with the tab/browser)
+    // Also clear any leftover localStorage cart from a previous session
+    localStorage.removeItem(CART_KEY);
+    const stored = sessionStorage.getItem(CART_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -20,11 +31,39 @@ const loadCart = () => {
 };
 
 const saveCart = (items) => {
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
+  if (isLoggedIn()) {
+    localStorage.setItem(CART_KEY, JSON.stringify(items));
+    sessionStorage.removeItem(CART_KEY);
+  } else {
+    // Guest: sessionStorage only — cleared when tab/browser closes
+    sessionStorage.setItem(CART_KEY, JSON.stringify(items));
+    localStorage.removeItem(CART_KEY);
+  }
 };
 
 export const CartProvider = ({ children }) => {
+  const { user } = useAuth();
+  const prevUser = useRef(user);
   const [items, setItems] = useState(loadCart);
+
+  // React to login / logout
+  useEffect(() => {
+    const wasLoggedIn = !!prevUser.current;
+    const nowLoggedIn = !!user;
+    prevUser.current = user;
+
+    if (wasLoggedIn === nowLoggedIn) return;
+
+    if (nowLoggedIn) {
+      // Just logged in — migrate guest cart to localStorage
+      saveCart(items);
+    } else {
+      // Just logged out — wipe cart everywhere
+      localStorage.removeItem(CART_KEY);
+      sessionStorage.removeItem(CART_KEY);
+      setItems([]);
+    }
+  }, [user, items]);
 
   const updateItems = useCallback((newItems) => {
     setItems(newItems);

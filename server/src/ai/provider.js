@@ -69,6 +69,51 @@ class OpenAIProvider extends AIProvider {
   }
 }
 
+class DeepSeekProvider extends AIProvider {
+  constructor(config = {}) {
+    super(config);
+    this.apiKey = config.apiKey || process.env.DEEPSEEK_API_KEY;
+    this.chatModel = config.chatModel || process.env.AI_CHAT_MODEL || 'deepseek-chat';
+    this.baseUrl = config.baseUrl || 'https://api.deepseek.com';
+  }
+
+  async chat(messages, options = {}) {
+    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: options.model || this.chatModel,
+        messages,
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens || 1024,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`DeepSeek API error: ${err.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices[0]?.message?.content || '',
+      usage: data.usage,
+    };
+  }
+
+  async embed(text) {
+    // DeepSeek doesn't offer an embedding API — fall back to OpenAI if key is available
+    if (process.env.OPENAI_API_KEY) {
+      const fallback = new OpenAIProvider();
+      return fallback.embed(text);
+    }
+    throw new Error('Embedding not supported by DeepSeek and no OPENAI_API_KEY configured for fallback');
+  }
+}
+
 class AnthropicProvider extends AIProvider {
   constructor(config = {}) {
     super(config);
@@ -119,6 +164,8 @@ class AnthropicProvider extends AIProvider {
 const getProvider = (providerName) => {
   const name = providerName || process.env.AI_PROVIDER || 'openai';
   switch (name.toLowerCase()) {
+    case 'deepseek':
+      return new DeepSeekProvider();
     case 'anthropic':
       return new AnthropicProvider();
     case 'openai':
@@ -127,4 +174,4 @@ const getProvider = (providerName) => {
   }
 };
 
-module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, getProvider };
+module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, DeepSeekProvider, getProvider };

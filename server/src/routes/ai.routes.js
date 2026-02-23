@@ -4,69 +4,35 @@ const prisma = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
+const { processQuery } = require('../ai/query');
+const logger = require('../config/logger');
 
 // POST /api/ai/query — customer or admin AI query
 router.post('/query', aiLimiter, async (req, res, next) => {
   try {
-    const { query, context = 'customer', userId } = req.body;
+    const { query, context = 'customer', userId, conversationHistory = [] } = req.body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       throw new AppError('Query is required', 400);
     }
 
-    // ── Find relevant documents via text search (vector search would use pgvector) ──
-    const documents = await prisma.aiDocument.findMany({
-      where: {
-        OR: [
-          { title: { contains: query.split(' ')[0], mode: 'insensitive' } },
-          { content: { contains: query.split(' ')[0], mode: 'insensitive' } },
-        ],
-      },
-      take: 5,
-      select: { id: true, sourceType: true, sourceId: true, title: true, content: true },
-    });
-
-    // Build citations
-    const citations = documents.map((doc) => ({
-      sourceType: doc.sourceType,
-      sourceId: doc.sourceId,
-      title: doc.title,
-      chunk: doc.content.substring(0, 200),
-    }));
-
-    // Placeholder response — in production, this would call OpenAI/Anthropic
-    const response = documents.length
-      ? `Based on our knowledge base, here's what I found related to your question:\n\n${documents.map((d) => `**${d.title}**: ${d.content.substring(0, 300)}...`).join('\n\n')}`
-      : 'I\'m sorry, I couldn\'t find specific information about that. Please contact us directly for assistance.';
-
-    // Safety flags placeholder
-    const safetyFlags = {
-      medical: /medical|health|allerg/i.test(query),
-      allergen: /allergen|gluten|nut|dairy|egg|soy/i.test(query),
-    };
-
-    // Log query
-    const aiQuery = await prisma.aiQuery.create({
-      data: {
-        userId: userId || null,
-        query,
-        response,
-        citations,
-        safetyFlags,
-        context,
-      },
+    const result = await processQuery({
+      query: query.trim(),
+      context,
+      userId: userId || null,
+      conversationHistory,
     });
 
     res.json({
       success: true,
       data: {
-        id: aiQuery.id,
-        response,
-        citations,
-        safetyFlags,
+        response: result.response,
+        citations: result.citations,
+        safetyFlags: result.safetyFlags,
       },
     });
   } catch (error) {
+    logger.error(`AI query failed: ${error.message}`);
     next(error);
   }
 });
@@ -85,25 +51,47 @@ router.post('/ingest', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (r
       throw new AppError(`sourceType must be one of: ${validTypes.join(', ')}`, 400);
     }
 
-    const document = await prisma.aiDocument.upsert({
-      where: { sourceType_sourceId: { sourceType, sourceId } },
-      update: { title, content, metadata: metadata || null },
-      create: { sourceType, sourceId, title, content, metadata: metadata || null },
-    });
-
-    // In production: chunk text and generate embeddings via OpenAI
-    // For now, create a single chunk for search
-    await prisma.aiEmbedding.deleteMany({ where: { documentId: document.id } });
-    await prisma.aiEmbedding.create({
-      data: {
-        documentId: document.id,
-        chunkIndex: 0,
-        chunkText: content.substring(0, 8000),
-      },
-    });
+    const { upsertDocument } = require('../ai/ingestion');
+    const document = await upsertDocument({ sourceType, sourceId, title, content, metadata });
 
     res.status(201).json({ success: true, data: document });
   } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/ai/ingest/products — bulk ingest all products
+router.post('/ingest/products', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { ingestAllProducts } = require('../ai/ingestion');
+    const count = await ingestAllProducts();
+    res.json({ success: true, data: { count }, message: `Ingested ${count} products` });
+  } catch (error) {
+    logger.error(`Product ingestion failed: ${error.message}`);
+    next(error);
+  }
+});
+
+// POST /api/ai/ingest/kb — bulk ingest all KB articles
+router.post('/ingest/kb', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { ingestAllArticles } = require('../ai/ingestion');
+    const count = await ingestAllArticles();
+    res.json({ success: true, data: { count }, message: `Ingested ${count} articles` });
+  } catch (error) {
+    logger.error(`KB ingestion failed: ${error.message}`);
+    next(error);
+  }
+});
+
+// POST /api/ai/ingest/all — bulk ingest everything
+router.post('/ingest/all', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { ingestAll } = require('../ai/ingestion');
+    const result = await ingestAll();
+    res.json({ success: true, data: result, message: `Ingested ${result.products} products and ${result.articles} articles` });
+  } catch (error) {
+    logger.error(`Full ingestion failed: ${error.message}`);
     next(error);
   }
 });

@@ -46,6 +46,8 @@ import AdminKnowledgeBase from './pages/admin/AdminKnowledgeBase';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminAI from './pages/admin/AdminAI';
+import AdminRecipes from './pages/admin/AdminRecipes';
+import AdminRecipeEdit from './pages/admin/AdminRecipeEdit';
 
 // POS
 import POSScreen from './pages/pos/POSScreen';
@@ -104,6 +106,9 @@ function App() {
                   <Route path="analytics" element={<AdminAnalytics />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="ai" element={<AdminAI />} />
+                  <Route path="recipes" element={<AdminRecipes />} />
+                  <Route path="recipes/new" element={<AdminRecipeEdit />} />
+                  <Route path="recipes/:id/edit" element={<AdminRecipeEdit />} />
                 </Route>
 
                 {/* POS Routes */}

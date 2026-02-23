@@ -32,7 +32,7 @@ const LoginPage = () => {
     try {
       const user = await login(form.email, form.password);
       showSnackbar(`Welcome back, ${user.firstName || 'there'}!`, 'success');
-      navigate(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER' ? '/admin' : '/account');
+      navigate(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER' ? '/admin' : '/shop');
     } catch (err) {
       showSnackbar(err.response?.data?.message || 'Invalid email or password.', 'error');
     } finally {

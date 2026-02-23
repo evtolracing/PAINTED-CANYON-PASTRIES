@@ -709,3 +709,30 @@ model CateringLead {
 
   @@map("catering_leads")
 }
+
+// ─── RECIPES ──────────────────────────────────────────────
+
+model Recipe {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  description   String?
+  ingredients   String?  // Plain text or JSON list
+  instructions  String?  // Step-by-step instructions
+  yield         String?  // e.g. "24 cookies", "1 loaf"
+  prepTime      Int?     // in minutes
+  bakeTime      Int?     // in minutes
+  totalTime     Int?     // in minutes
+  temperature   String?  // e.g. "350°F"
+  difficulty    String?  // "Easy", "Medium", "Advanced"
+  notes         String?  // Tips, variations
+  imageUrl      String?  // Primary recipe photo
+  documents     Json?    // Array of { url, name, type } for uploaded PDFs/docs
+  tags          String[] @default([])
+  isPublished   Boolean  @default(false)
+  isAIGenerated Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("recipes")
+}

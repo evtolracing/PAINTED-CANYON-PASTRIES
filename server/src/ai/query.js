@@ -19,7 +19,13 @@ RULES:
 - For order status inquiries, ask the customer to provide their order number and email to verify identity.
 - You can recommend products based on preferences.
 - You can help build carts for groups/events.
-- If you don't know something, say so honestly.`,
+- If you don't know something, say so honestly.
+
+FORMATTING:
+- NEVER use markdown formatting in your responses. No asterisks, no hashtags, no bold, no italics, no bullet points with dashes.
+- Write in plain, natural sentences and short paragraphs.
+- Use line breaks to separate ideas, not bullet lists.
+- Keep responses conversational and easy to read as plain text.`,
 
   admin: `You are the Painted Canyon Pastries admin AI assistant — a smart operations helper for bakery staff.
 
@@ -34,7 +40,13 @@ CAPABILITIES:
 RULES:
 - Be concise and action-oriented.
 - Cite data sources when providing specific numbers.
-- Provide practical, bakery-operations-focused advice.`,
+- Provide practical, bakery-operations-focused advice.
+
+FORMATTING:
+- NEVER use markdown formatting in your responses. No asterisks, no hashtags, no bold, no italics, no bullet points with dashes.
+- Write in plain, natural sentences and short paragraphs.
+- Use line breaks to separate ideas, not bullet lists.
+- When listing items, use simple numbered lists or commas instead of markdown bullets.`,
 };
 
 const searchSimilarChunks = async (queryEmbedding, limit = 5, context = 'customer') => {
@@ -95,13 +107,42 @@ const processQuery = async ({ query, context = 'customer', userId = null, conver
     return safeResponse;
   }
 
-  // Generate embedding for query
+  // Generate embedding for query or fall back to text search
   let relevantChunks = [];
   try {
     const queryEmbedding = await provider.embed(query);
     relevantChunks = await searchSimilarChunks(queryEmbedding, 5, context);
   } catch (error) {
-    logger.warn(`Embedding search failed, proceeding without context: ${error.message}`);
+    logger.warn(`Embedding search failed, falling back to text search: ${error.message}`);
+    // Fallback: text-based search using Prisma
+    try {
+      const typeFilter = context === 'customer'
+        ? { sourceType: { in: ['PRODUCT', 'KB_ARTICLE', 'FAQ', 'POLICY'] } }
+        : {};
+      const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 3);
+      if (keywords.length > 0) {
+        const docs = await prisma.aiDocument.findMany({
+          where: {
+            ...typeFilter,
+            OR: keywords.flatMap(kw => [
+              { title: { contains: kw, mode: 'insensitive' } },
+              { content: { contains: kw, mode: 'insensitive' } },
+            ]),
+          },
+          take: 5,
+          select: { title: true, sourceType: true, sourceId: true, content: true },
+        });
+        relevantChunks = docs.map(d => ({
+          title: d.title,
+          source_type: d.sourceType,
+          source_id: d.sourceId,
+          chunk_text: d.content.substring(0, 500),
+          similarity: 0.8,
+        }));
+      }
+    } catch (searchError) {
+      logger.warn(`Text search fallback also failed: ${searchError.message}`);
+    }
   }
 
   // Build context from retrieved chunks

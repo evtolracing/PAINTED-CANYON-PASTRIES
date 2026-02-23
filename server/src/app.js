@@ -31,6 +31,7 @@ const webhookRoutes = require('./routes/webhook.routes');
 const newsletterRoutes = require('./routes/newsletter.routes');
 const cateringRoutes = require('./routes/catering.routes');
 const contactRoutes = require('./routes/contact.routes');
+const recipeRoutes = require('./routes/recipe.routes');
 
 const app = express();
 
@@ -91,19 +92,21 @@ app.use('/api/pos', posRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/catering', cateringRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/recipes', recipeRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Painted Canyon Pastries API' });
 });
 
-// Serve React build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../client/build')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../client/build', 'index.html'));
-  });
-}
+// Serve React build
+const clientBuildPath = path.join(__dirname, '../../client/build');
+app.use(express.static(clientBuildPath));
+app.get('*', (req, res, next) => {
+  // Don't serve index.html for API routes
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
 
 // Error handling
 app.use(notFoundHandler);

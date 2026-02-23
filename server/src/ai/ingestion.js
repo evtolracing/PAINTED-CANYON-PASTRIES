@@ -87,8 +87,6 @@ const ingestPolicy = async (key, title, content) => {
 
 const upsertDocument = async ({ sourceType, sourceId, title, content, metadata }) => {
   try {
-    const provider = getProvider();
-
     // Upsert the document
     const doc = await prisma.aiDocument.upsert({
       where: { sourceType_sourceId: { sourceType, sourceId } },
@@ -99,24 +97,43 @@ const upsertDocument = async ({ sourceType, sourceId, title, content, metadata }
     // Delete old embeddings
     await prisma.aiEmbedding.deleteMany({ where: { documentId: doc.id } });
 
-    // Chunk and embed
+    // Chunk text
     const chunks = chunkText(content);
 
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await provider.embed(chunks[i]);
-
-      // Insert embedding using raw SQL since Prisma doesn't support vector type natively
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO ai_embeddings (id, document_id, chunk_index, chunk_text, embedding, created_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4::vector, NOW())`,
-        doc.id,
-        i,
-        chunks[i],
-        `[${embedding.join(',')}]`
-      );
+    // Try to generate embeddings with the AI provider
+    let hasEmbeddings = false;
+    try {
+      const provider = getProvider();
+      for (let i = 0; i < chunks.length; i++) {
+        const embedding = await provider.embed(chunks[i]);
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO ai_embeddings (id, document_id, chunk_index, chunk_text, embedding, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4::vector, NOW())`,
+          doc.id,
+          i,
+          chunks[i],
+          `[${embedding.join(',')}]`
+        );
+      }
+      hasEmbeddings = true;
+    } catch (embedError) {
+      logger.warn(`Embedding generation unavailable (${embedError.message}), storing text chunks only`);
     }
 
-    logger.info(`Ingested document: ${sourceType}/${sourceId} (${chunks.length} chunks)`);
+    // If embeddings failed, store chunks as text-only for text search fallback
+    if (!hasEmbeddings) {
+      for (let i = 0; i < chunks.length; i++) {
+        await prisma.aiEmbedding.create({
+          data: {
+            documentId: doc.id,
+            chunkIndex: i,
+            chunkText: chunks[i],
+          },
+        });
+      }
+    }
+
+    logger.info(`Ingested document: ${sourceType}/${sourceId} (${chunks.length} chunks, embeddings: ${hasEmbeddings})`);
     return doc;
   } catch (error) {
     logger.error(`Ingestion failed for ${sourceType}/${sourceId}: ${error.message}`);
