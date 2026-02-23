@@ -52,11 +52,13 @@ import POSScreen from './pages/pos/POSScreen';
 
 // Guards
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <ErrorBoundary>
       <SnackbarProvider>
         <AuthProvider>
           <CartProvider>
@@ -113,6 +115,7 @@ function App() {
           </CartProvider>
         </AuthProvider>
       </SnackbarProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

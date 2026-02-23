@@ -42,7 +42,13 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        // Only redirect to login if we're not already on a public page
+        // This prevents losing cart/checkout progress
+        const publicPaths = ['/shop', '/cart', '/checkout', '/product', '/', '/about', '/faq', '/contact', '/catering'];
+        const isPublicPage = publicPaths.some(p => window.location.pathname.startsWith(p)) || window.location.pathname === '/';
+        if (!isPublicPage) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }

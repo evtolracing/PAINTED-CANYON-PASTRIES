@@ -7,7 +7,7 @@ import {
   ToggleButtonGroup, Skeleton,
 } from '@mui/material';
 import {
-  LocalShipping, Storefront, Schedule, Payment, CheckCircle, ArrowBack,
+  LocalShipping, Storefront, Schedule, CheckCircle, ArrowBack,
   ArrowForward,
 } from '@mui/icons-material';
 import api from '../../services/api';
@@ -336,14 +336,19 @@ const CheckoutPage = () => {
             <Stack spacing={3}>
               <Typography variant="h5">Payment</Typography>
 
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, textAlign: 'center', bgcolor: 'sandstone.50' }}>
-                <Payment sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                <Typography variant="subtitle1" color="text.secondary">
-                  Stripe payment integration will appear here
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Card details are securely handled by Stripe
-                </Typography>
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: 'rgba(124,139,111,0.06)' }}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <CheckCircle sx={{ fontSize: 36, color: 'success.main' }} />
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {fulfillment === 'DELIVERY' ? 'Pay on Delivery' : 'Pay at Pickup'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Payment will be collected when you {fulfillment === 'DELIVERY' ? 'receive your delivery' : 'pick up your order'}.
+                      Cash and card accepted.
+                    </Typography>
+                  </Box>
+                </Stack>
               </Paper>
 
               <Box>
@@ -372,21 +377,23 @@ const CheckoutPage = () => {
                 </ToggleButtonGroup>
               </Box>
 
-              <TextField
-                label="Promo Code" size="small" value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                sx={{ maxWidth: 300 }}
-              />
-              <Button
-                variant="outlined"
-                onClick={handleApplyPromo}
-                disabled={promoLoading || !promoCode.trim()}
-                sx={{ maxWidth: 120 }}
-              >
-                {promoLoading ? 'Checking...' : 'Apply'}
-              </Button>
+              <Stack direction="row" spacing={1} alignItems="flex-end">
+                <TextField
+                  label="Promo Code" size="small" value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  sx={{ maxWidth: 300 }}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={handleApplyPromo}
+                  disabled={promoLoading || !promoCode.trim()}
+                  sx={{ height: 40 }}
+                >
+                  {promoLoading ? 'Checking...' : 'Apply'}
+                </Button>
+              </Stack>
               {promoData && (
-                <Alert severity="success" sx={{ mt: 1 }}>
+                <Alert severity="success">
                   Promo "{promoData.code}" applied — ${promoDiscount.toFixed(2)} off
                 </Alert>
               )}

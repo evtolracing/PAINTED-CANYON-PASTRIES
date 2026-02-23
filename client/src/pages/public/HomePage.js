@@ -5,7 +5,7 @@ import {
   CardActions, Chip, Stack, TextField, IconButton, Rating, Skeleton, Paper
 } from '@mui/material';
 import {
-  ArrowForward, LocalShipping, StorefrontOutlined, Schedule, Star,
+  ArrowForward, StorefrontOutlined, Schedule, Star,
   Email as EmailIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
@@ -111,17 +111,16 @@ const HomePage = () => {
                   endIcon={<ArrowForward />}
                   sx={{ px: 4, py: 1.5, fontSize: '1rem' }}
                 >
-                  Order for Pickup
+                  Order Now
                 </Button>
                 <Button
                   component={Link}
-                  to="/shop"
+                  to="/catering"
                   variant="outlined"
                   size="large"
-                  startIcon={<LocalShipping />}
                   sx={{ px: 4, py: 1.5, fontSize: '1rem' }}
                 >
-                  Order Delivery
+                  Catering Menu
                 </Button>
               </Stack>
             </Grid>

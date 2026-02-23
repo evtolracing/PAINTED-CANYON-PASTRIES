@@ -4,10 +4,10 @@ import {
   Box, Container, Typography, Grid, Card, CardMedia, CardContent, CardActions,
   Button, TextField, Chip, Stack, Skeleton, InputAdornment, Tabs, Tab,
   Drawer, List, ListItemButton, ListItemText, IconButton, useMediaQuery,
-  useTheme, Paper, Divider, Badge,
+  useTheme, Paper, Divider, Badge, Slide,
 } from '@mui/material';
 import {
-  Search, FilterList, ShoppingCart, Star, LocalOffer, Close,
+  Search, FilterList, ShoppingCart, Star, LocalOffer, Close, ArrowForward,
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
@@ -42,7 +42,7 @@ const ShopPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { addItem } = useCart();
+  const { addItem, itemCount, subtotal } = useCart();
   const { showSnackbar } = useSnackbar();
 
   const activeCategory = category || 'all';
@@ -283,6 +283,49 @@ const ShopPage = () => {
           </Grid>
         </Grid>
       </Container>
+
+      {/* Floating Cart Bar */}
+      <Slide direction="up" in={itemCount > 0} mountOnEnter unmountOnExit>
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1200,
+            borderRadius: '16px 16px 0 0',
+            overflow: 'hidden',
+          }}
+        >
+          <Button
+            component={Link}
+            to="/cart"
+            fullWidth
+            variant="contained"
+            size="large"
+            sx={{
+              py: 2,
+              px: 3,
+              borderRadius: 0,
+              justifyContent: 'space-between',
+              textTransform: 'none',
+              fontSize: '1rem',
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Badge badgeContent={itemCount} color="error" sx={{ '& .MuiBadge-badge': { fontWeight: 700 } }}>
+                <ShoppingCart />
+              </Badge>
+              <Typography fontWeight={600}>View Cart</Typography>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography fontWeight={700}>${subtotal.toFixed(2)}</Typography>
+              <ArrowForward fontSize="small" />
+            </Stack>
+          </Button>
+        </Paper>
+      </Slide>
     </Box>
   );
 };
