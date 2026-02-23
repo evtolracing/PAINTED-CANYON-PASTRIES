@@ -6,6 +6,7 @@ import {
 import {
   LocalShipping, Replay, Warning, PrivacyTip, Accessibility as AccessibilityIcon,
 } from '@mui/icons-material';
+import api from '../../services/api';
 
 const SECTIONS = [
   { slug: 'delivery', label: 'Delivery Policy', icon: <LocalShipping /> },
@@ -15,37 +16,39 @@ const SECTIONS = [
   { slug: 'accessibility', label: 'Accessibility', icon: <AccessibilityIcon /> },
 ];
 
-const policyContent = {
-  delivery: {
-    title: 'Delivery Policy',
-    content: `
+const buildPolicyContent = (info) => {
+  const address = info?.address ? `${info.address}, ${info.city || ''}, ${info.state || ''} ${info.zip || ''}` : 'our bakery';
+  const email = info?.email || 'our email';
+  const phone = info?.phone || 'our phone';
+
+  return {
+    delivery: {
+      title: 'Delivery Policy',
+      content: `
 **Delivery Area**
-We currently deliver within a 15-mile radius of our bakery located at 2847 Canyon Road, Sedona, AZ 86336.
+We currently deliver within the Joshua Tree and surrounding high desert communities. Check our delivery ZIP codes at checkout.
 
 **Delivery Hours**
-Deliveries are available Monday through Saturday, between 8:00 AM and 4:00 PM. Sunday deliveries are available for orders placed before Friday at 5:00 PM.
+Deliveries are available during our open hours. Check our Contact page for current hours.
 
 **Delivery Fees**
-- Within 5 miles: $5.00
-- 5–10 miles: $8.00
-- 10–15 miles: $12.00
-Orders over $75 qualify for free delivery within 10 miles.
+Delivery fees vary by distance and order size. Orders over a certain threshold may qualify for free delivery.
 
 **Handling & Packaging**
 All items are carefully packaged in temperature-appropriate containers to ensure freshness upon arrival. Cakes are secured in sturdy boxes with non-slip liners.
 
 **Missed Deliveries**
 If you are unavailable at the time of delivery, our driver will attempt to leave the order in a safe location. If this is not possible, we will contact you to arrange redelivery (additional fees may apply).
-    `,
-  },
-  refunds: {
-    title: 'Refund & Returns Policy',
-    content: `
+      `,
+    },
+    refunds: {
+      title: 'Refund & Returns Policy',
+      content: `
 **Our Guarantee**
 We take pride in every item we bake. If you're not satisfied with your order, we want to make it right.
 
 **Requesting a Refund**
-Please contact us within 24 hours of receiving your order at hello@paintedcanyonpastries.com or (928) 555-0142. Include your order number and a description of the issue.
+Please contact us within 24 hours of receiving your order at ${email} or ${phone}. Include your order number and a description of the issue.
 
 **Eligible Refunds**
 - Incorrect items received
@@ -59,11 +62,11 @@ Please contact us within 24 hours of receiving your order at hello@paintedcanyon
 
 **Resolution Options**
 Depending on the issue, we may offer a full refund, store credit, or a replacement item at no charge. We aim to resolve all issues within 2 business days.
-    `,
-  },
-  allergens: {
-    title: 'Allergen Information',
-    content: `
+      `,
+    },
+    allergens: {
+      title: 'Allergen Information',
+      content: `
 **Common Allergens**
 Our products may contain or come into contact with the following allergens:
 - **Wheat/Gluten** — used in most baked goods
@@ -81,11 +84,11 @@ All products on our website and in-store are labeled with allergen information. 
 
 **Custom Dietary Needs**
 For custom orders accommodating specific allergies or dietary restrictions, please reach out at least 72 hours in advance.
-    `,
-  },
-  privacy: {
-    title: 'Privacy Policy',
-    content: `
+      `,
+    },
+    privacy: {
+      title: 'Privacy Policy',
+      content: `
 **Information We Collect**
 We collect information you provide directly: name, email, phone number, delivery address, and payment information when you place an order.
 
@@ -102,15 +105,15 @@ All payment information is processed securely through Stripe and is never stored
 We do not sell or share your personal information with third parties, except as necessary to fulfill your orders (e.g., delivery services) or comply with legal obligations.
 
 **Your Rights**
-You may request access to, correction of, or deletion of your personal data at any time by contacting us at hello@paintedcanyonpastries.com.
+You may request access to, correction of, or deletion of your personal data at any time by contacting us at ${email}.
 
 **Cookies**
 Our website uses cookies to enhance your browsing experience and remember your cart. You can manage cookie preferences in your browser settings.
-    `,
-  },
-  accessibility: {
-    title: 'Accessibility Statement',
-    content: `
+      `,
+    },
+    accessibility: {
+      title: 'Accessibility Statement',
+      content: `
 **Our Commitment**
 Painted Canyon Pastries is committed to ensuring digital accessibility for people with disabilities. We continually improve the user experience for everyone and apply relevant accessibility standards.
 
@@ -134,14 +137,26 @@ Our bakery is wheelchair accessible with:
 - Wide aisles
 
 **Feedback**
-If you encounter any accessibility barriers on our website, please contact us at hello@paintedcanyonpastries.com. We welcome your feedback and will work to address any issues promptly.
-    `,
-  },
+If you encounter any accessibility barriers on our website, please contact us at ${email}. We welcome your feedback and will work to address any issues promptly.
+      `,
+    },
+  };
 };
 
 const PoliciesPage = () => {
   const { slug } = useParams();
   const [activeTab, setActiveTab] = useState(0);
+  const [bakeryInfo, setBakeryInfo] = useState(null);
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      try {
+        const { data } = await api.get('/settings/public');
+        setBakeryInfo(data.data.bakeryInfo);
+      } catch { /* silent */ }
+    };
+    fetchInfo();
+  }, []);
 
   useEffect(() => {
     if (slug) {
@@ -151,6 +166,7 @@ const PoliciesPage = () => {
   }, [slug]);
 
   const activeSection = SECTIONS[activeTab];
+  const policyContent = buildPolicyContent(bakeryInfo);
   const content = policyContent[activeSection.slug];
 
   return (

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, Grid, Paper, TextField, Button, Stack, Divider,
-  CircularProgress,
+  CircularProgress, Skeleton,
 } from '@mui/material';
 import {
   Email, Phone, LocationOn, AccessTime, Send,
@@ -9,22 +9,38 @@ import {
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
 
-const info = [
-  { icon: <LocationOn />, label: 'Address', value: '2847 Canyon Road, Sedona, AZ 86336' },
-  { icon: <Phone />, label: 'Phone', value: '(928) 555-0142' },
-  { icon: <Email />, label: 'Email', value: 'hello@paintedcanyonpastries.com' },
-];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const hours = [
-  { day: 'Monday – Friday', time: '6:00 AM – 6:00 PM' },
-  { day: 'Saturday', time: '7:00 AM – 5:00 PM' },
-  { day: 'Sunday', time: '8:00 AM – 2:00 PM' },
-];
+const formatTime = (t) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
+};
 
 const ContactPage = () => {
   const { showSnackbar } = useSnackbar();
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [bakeryInfo, setBakeryInfo] = useState(null);
+  const [storeHours, setStoreHours] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      try {
+        const { data } = await api.get('/settings/public');
+        setBakeryInfo(data.data.bakeryInfo);
+        setStoreHours(data.data.storeHours || []);
+      } catch {
+        // silent fail
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInfo();
+  }, []);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -108,17 +124,43 @@ const ContactPage = () => {
               {/* Contact Info */}
               <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
                 <Typography variant="h5" gutterBottom>Bakery Info</Typography>
-                <Stack spacing={2}>
-                  {info.map((item, idx) => (
-                    <Stack key={idx} direction="row" spacing={2} alignItems="flex-start">
-                      <Box sx={{ color: 'primary.main', mt: 0.5 }}>{item.icon}</Box>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={600}>{item.label}</Typography>
-                        <Typography variant="body2" color="text.secondary">{item.value}</Typography>
-                      </Box>
-                    </Stack>
-                  ))}
-                </Stack>
+                {loading ? (
+                  <Stack spacing={2}>
+                    <Skeleton width="80%" /><Skeleton width="60%" /><Skeleton width="70%" />
+                  </Stack>
+                ) : (
+                  <Stack spacing={2}>
+                    {bakeryInfo?.address && (
+                      <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Box sx={{ color: 'primary.main', mt: 0.5 }}><LocationOn /></Box>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={600}>Address</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {bakeryInfo.address}{bakeryInfo.city ? `, ${bakeryInfo.city}` : ''}{bakeryInfo.state ? `, ${bakeryInfo.state}` : ''} {bakeryInfo.zip || ''}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                    {bakeryInfo?.phone && (
+                      <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Box sx={{ color: 'primary.main', mt: 0.5 }}><Phone /></Box>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={600}>Phone</Typography>
+                          <Typography variant="body2" color="text.secondary">{bakeryInfo.phone}</Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                    {bakeryInfo?.email && (
+                      <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Box sx={{ color: 'primary.main', mt: 0.5 }}><Email /></Box>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={600}>Email</Typography>
+                          <Typography variant="body2" color="text.secondary">{bakeryInfo.email}</Typography>
+                        </Box>
+                      </Stack>
+                    )}
+                  </Stack>
+                )}
               </Paper>
 
               {/* Hours */}
@@ -127,33 +169,45 @@ const ContactPage = () => {
                   <AccessTime color="primary" />
                   <Typography variant="h5">Bakery Hours</Typography>
                 </Stack>
-                {hours.map((h, idx) => (
-                  <Stack key={idx} direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
-                    <Typography variant="body2" fontWeight={600}>{h.day}</Typography>
-                    <Typography variant="body2" color="text.secondary">{h.time}</Typography>
-                  </Stack>
-                ))}
+                {loading ? (
+                  <Stack spacing={1}>{Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} width="90%" />)}</Stack>
+                ) : storeHours.length > 0 ? (
+                  storeHours.map((h) => (
+                    <Stack key={h.dayOfWeek} direction="row" justifyContent="space-between" sx={{ py: 0.75 }}>
+                      <Typography variant="body2" fontWeight={600}>{DAY_NAMES[h.dayOfWeek]}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {h.isClosed ? 'Closed' : `${formatTime(h.openTime)} – ${formatTime(h.closeTime)}`}
+                      </Typography>
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">Hours not available</Typography>
+                )}
               </Paper>
 
-              {/* Map Placeholder */}
-              <Paper
-                elevation={0}
-                sx={{
-                  height: 200,
-                  borderRadius: 3,
-                  bgcolor: 'sandstone.100',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Stack alignItems="center" spacing={1}>
-                  <LocationOn sx={{ fontSize: 40, color: 'primary.main' }} />
-                  <Typography variant="body2" color="text.secondary">Map placeholder</Typography>
-                </Stack>
-              </Paper>
+              {/* Map */}
+              {bakeryInfo?.address && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    height: 200,
+                    borderRadius: 3,
+                    overflow: 'hidden',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <iframe
+                    title="Bakery Location"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(`${bakeryInfo.address}, ${bakeryInfo.city || ''}, ${bakeryInfo.state || ''} ${bakeryInfo.zip || ''}`)}&output=embed`}
+                  />
+                </Paper>
+              )}
             </Stack>
           </Grid>
         </Grid>

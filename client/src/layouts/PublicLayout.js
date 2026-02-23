@@ -3,10 +3,11 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   AppBar, Toolbar, Box, Typography, Button, IconButton, Badge, Drawer,
   List, ListItem, ListItemButton, ListItemText, Container, Divider, Stack,
-  Avatar
+  Avatar, Menu, MenuItem, ListItemIcon
 } from '@mui/material';
 import {
-  ShoppingCart, Menu as MenuIcon, Close, Person, StorefrontOutlined
+  ShoppingCart, Menu as MenuIcon, Close, Person, StorefrontOutlined,
+  Logout, History
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -27,6 +28,7 @@ const PublicLayout = () => {
   const { itemCount } = useCart();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -112,18 +114,42 @@ const PublicLayout = () => {
                 </Button>
               )}
               {user ? (
-                <IconButton component={Link} to="/account" size="small">
-                  {user.avatar ? (
-                    <Avatar
-                      src={`${API_HOST}${user.avatar}`}
-                      sx={{ width: 28, height: 28 }}
-                    />
-                  ) : (
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
-                      {user.firstName?.[0]}{user.lastName?.[0]}
-                    </Avatar>
-                  )}
-                </IconButton>
+                <>
+                  <IconButton onClick={(e) => setUserMenuAnchor(e.currentTarget)} size="small">
+                    {user.avatar ? (
+                      <Avatar
+                        src={`${API_HOST}${user.avatar}`}
+                        sx={{ width: 28, height: 28 }}
+                      />
+                    ) : (
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.75rem' }}>
+                        {user.firstName?.[0]}{user.lastName?.[0]}
+                      </Avatar>
+                    )}
+                  </IconButton>
+                  <Menu
+                    anchorEl={userMenuAnchor}
+                    open={Boolean(userMenuAnchor)}
+                    onClose={() => setUserMenuAnchor(null)}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                    PaperProps={{ sx: { minWidth: 180, mt: 1 } }}
+                  >
+                    <MenuItem onClick={() => { setUserMenuAnchor(null); navigate('/account'); }}>
+                      <ListItemIcon><Person fontSize="small" /></ListItemIcon>
+                      My Account
+                    </MenuItem>
+                    <MenuItem onClick={() => { setUserMenuAnchor(null); navigate('/orders'); }}>
+                      <ListItemIcon><History fontSize="small" /></ListItemIcon>
+                      Order History
+                    </MenuItem>
+                    <Divider />
+                    <MenuItem onClick={() => { setUserMenuAnchor(null); logout(); navigate('/'); }}>
+                      <ListItemIcon><Logout fontSize="small" /></ListItemIcon>
+                      Sign Out
+                    </MenuItem>
+                  </Menu>
+                </>
               ) : (
                 <Button component={Link} to="/login" size="small" sx={{ color: 'text.primary' }}>
                   Sign In

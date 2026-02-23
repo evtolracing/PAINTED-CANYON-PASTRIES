@@ -30,12 +30,7 @@ const values = [
   },
 ];
 
-const team = [
-  { name: 'Isabella Torres', role: 'Head Baker & Founder', initials: 'IT' },
-  { name: 'Marcus Chen', role: 'Pastry Chef', initials: 'MC' },
-  { name: 'Sofia Ramirez', role: 'Operations Manager', initials: 'SR' },
-  { name: 'David Kim', role: 'Front of House', initials: 'DK' },
-];
+const team = [];
 
 const AboutPage = () => {
   return (
@@ -93,14 +88,13 @@ const AboutPage = () => {
             <Typography variant="h3" gutterBottom>Baked in the Heart of the Desert</Typography>
             <Typography variant="body1" paragraph color="text.secondary">
               Painted Canyon Pastries was born from a love of baking and the breathtaking beauty of the
-              Southwest. Our founder, Isabella Torres, grew up in a family where the kitchen was the heart
-              of the home — where flour dusted the countertops and the aroma of fresh bread filled every room.
+              high desert. What started as a passion for creating handcrafted pastries has grown into a
+              bakery that celebrates the colors, flavors, and warmth of Joshua Tree.
             </Typography>
             <Typography variant="body1" paragraph color="text.secondary">
-              After years of honing her craft in bakeries across the country, Isabella returned home with a
-              vision: to create a bakery that celebrates the colors, flavors, and warmth of the painted
-              desert. Every pastry we make is inspired by the landscape — from our signature sandstone
-              cookies to our canyon-layered croissants.
+              Every pastry we make is inspired by the landscape around us — from our signature sandstone
+              cookies to our canyon-layered croissants. We source ingredients locally whenever possible
+              and bake everything in small batches to ensure freshness and quality.
             </Typography>
             <Typography variant="body1" color="text.secondary">
               Today, Painted Canyon Pastries is more than a bakery. It's a gathering place, a celebration
@@ -144,6 +138,7 @@ const AboutPage = () => {
       </Box>
 
       {/* Team */}
+      {team.length > 0 && (
       <Container maxWidth="lg" sx={{ py: { xs: 6, md: 10 } }}>
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="overline" sx={{ mb: 1, display: 'block' }}>The People Behind the Pastries</Typography>
@@ -171,6 +166,7 @@ const AboutPage = () => {
           ))}
         </Grid>
       </Container>
+      )}
 
       {/* CTA */}
       <Box sx={{ bgcolor: 'secondary.main', color: '#fff', py: { xs: 6, md: 8 }, textAlign: 'center' }}>

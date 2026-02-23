@@ -5,7 +5,7 @@ import {
   CardActions, Chip, Stack, TextField, IconButton, Rating, Skeleton, Paper
 } from '@mui/material';
 import {
-  ArrowForward, StorefrontOutlined, Schedule, Star,
+  ArrowForward, LocalShipping, StorefrontOutlined, Schedule, Star,
   Email as EmailIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
@@ -25,8 +25,7 @@ const HomePage = () => {
         const { data } = await api.get('/products?featured=true&limit=8');
         setProducts(data.data || []);
       } catch {
-        // Use placeholder data if API not ready
-        setProducts(placeholderProducts);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -448,14 +447,6 @@ const testimonials = [
   { name: 'Sarah K., Yucca Valley', text: 'The chocolate croissants are the best I\'ve had outside of Paris. Fresh every morning and absolutely perfect.' },
   { name: 'Mike R., Joshua Tree', text: 'Ordered a birthday cake for my daughter — it was stunning AND delicious. The whole party was raving about it!' },
   { name: 'Jenny L., Twentynine Palms', text: 'Love the gluten-free options! Finally a bakery that makes GF cookies that actually taste amazing.' },
-];
-
-// Placeholder products for when API isn't available
-const placeholderProducts = [
-  { id: '1', name: 'Desert Sunset Cookie', slug: 'desert-sunset-cookie', shortDescription: 'Brown butter & sea salt', basePrice: '4.50', badges: ['Best Seller'], category: { name: 'Cookies' } },
-  { id: '2', name: 'Classic Butter Croissant', slug: 'classic-butter-croissant', shortDescription: 'Layers of flaky perfection', basePrice: '5.50', badges: ['Best Seller'], category: { name: 'Croissants' } },
-  { id: '3', name: 'Canyon Carrot Cake', slug: 'canyon-carrot-cake', shortDescription: 'Cream cheese frosting', basePrice: '42.00', badges: [], category: { name: 'Cakes' } },
-  { id: '4', name: 'Prickly Pear Cupcake', slug: 'prickly-pear-cupcake', shortDescription: 'Seasonal desert flavor', basePrice: '5.00', badges: ['Seasonal'], category: { name: 'Cupcakes' } },
 ];
 
 export default HomePage;

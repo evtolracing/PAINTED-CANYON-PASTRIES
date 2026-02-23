@@ -4,6 +4,26 @@ const prisma = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
 
+// GET /api/settings/public — public bakery info + hours (no auth required)
+router.get('/public', async (req, res, next) => {
+  try {
+    const [bakeryInfo, storeHours] = await Promise.all([
+      prisma.setting.findUnique({ where: { key: 'bakery_info' } }),
+      prisma.storeHours.findMany({ orderBy: { dayOfWeek: 'asc' } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        bakeryInfo: bakeryInfo?.value || {},
+        storeHours: storeHours || [],
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/settings — get all settings (or specific key)
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
