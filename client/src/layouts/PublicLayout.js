@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import {
   AppBar, Toolbar, Box, Typography, Button, IconButton, Badge, Drawer,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import AIAssistantWidget from '../components/AIAssistantWidget';
+import api from '../services/api';
 
 const API_HOST = process.env.REACT_APP_API_HOST || 'http://localhost:5000';
 
@@ -29,6 +30,13 @@ const PublicLayout = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  const [bakeryLogo, setBakeryLogo] = useState(null);
+
+  useEffect(() => {
+    api.get('/settings/public').then(({ data }) => {
+      if (data.data?.bakeryLogo) setBakeryLogo(data.data.bakeryLogo);
+    }).catch(() => {});
+  }, []);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -52,7 +60,16 @@ const PublicLayout = () => {
                 gap: 1.5,
               }}
             >
-              <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 28 }} />
+              {bakeryLogo ? (
+                <Box
+                  component="img"
+                  src={`${API_HOST}${bakeryLogo}`}
+                  alt="Logo"
+                  sx={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 1 }}
+                />
+              ) : (
+                <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 28 }} />
+              )}
               <Box>
                 <Typography
                   variant="h6"

@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
   Search, Refresh, Person, ExpandMore, ExpandLess, Add, AttachMoney,
-  LocalOffer, ShoppingBag
+  LocalOffer, ShoppingBag, Edit, Delete
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
@@ -27,6 +27,16 @@ const AdminCustomers = () => {
   const [newTag, setNewTag] = useState('');
   const [creditDialog, setCreditDialog] = useState({ open: false, customerId: null });
   const [creditAmount, setCreditAmount] = useState('');
+  const [newCustomerDialog, setNewCustomerDialog] = useState(false);
+  const [newCustomerSaving, setNewCustomerSaving] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    firstName: '', lastName: '', email: '', phone: '', notes: '',
+  });
+  const [editDialog, setEditDialog] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, customer: null });
+  const [deleting, setDeleting] = useState(false);
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
@@ -89,6 +99,86 @@ const AdminCustomers = () => {
     }
   };
 
+  const handleNewCustomerChange = (field) => (e) => {
+    setNewCustomerForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const createCustomer = async () => {
+    const { firstName, lastName, email } = newCustomerForm;
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      showSnackbar('First name, last name, and email are required', 'error');
+      return;
+    }
+    setNewCustomerSaving(true);
+    try {
+      await api.post('/customers', newCustomerForm);
+      showSnackbar('Customer created', 'success');
+      setNewCustomerDialog(false);
+      setNewCustomerForm({ firstName: '', lastName: '', email: '', phone: '', notes: '' });
+      fetchCustomers();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to create customer', 'error');
+    } finally {
+      setNewCustomerSaving(false);
+    }
+  };
+
+  const openEditDialog = (customer) => {
+    setEditForm({
+      id: customer.id,
+      firstName: customer.firstName || '',
+      lastName: customer.lastName || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      notes: customer.notes || '',
+    });
+    setEditDialog(true);
+  };
+
+  const handleEditChange = (field) => (e) => {
+    setEditForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const saveEdit = async () => {
+    if (!editForm) return;
+    const { id, firstName, lastName, email } = editForm;
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      showSnackbar('First name, last name, and email are required', 'error');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const { id: _, ...payload } = editForm;
+      await api.put(`/customers/${id}`, payload);
+      showSnackbar('Customer updated', 'success');
+      setEditDialog(false);
+      setEditForm(null);
+      fetchCustomers();
+      if (expandedId === id) toggleExpand(id);
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to update customer', 'error');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const { customer } = deleteDialog;
+    if (!customer) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/customers/${customer.id}`);
+      showSnackbar('Customer deleted', 'success');
+      setDeleteDialog({ open: false, customer: null });
+      if (expandedId === customer.id) setExpandedId(null);
+      fetchCustomers();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to delete customer', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Collect all tags for filter
   const allTags = [...new Set(customers.flatMap(c => c.tags || []))];
 
@@ -96,7 +186,10 @@ const AdminCustomers = () => {
     <Container maxWidth="xl" sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, color: 'secondary.main' }}>Customers</Typography>
-        <IconButton onClick={fetchCustomers}><Refresh /></IconButton>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setNewCustomerDialog(true)}>Add Customer</Button>
+          <IconButton onClick={fetchCustomers}><Refresh /></IconButton>
+        </Box>
       </Box>
 
       {/* Filters */}
@@ -197,6 +290,10 @@ const AdminCustomers = () => {
                                     {expandedData.notes || 'No notes'}
                                   </Typography>
                                   <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                                    <Button size="small" variant="outlined" startIcon={<Edit />}
+                                      onClick={(e) => { e.stopPropagation(); openEditDialog(customer); }}>
+                                      Edit
+                                    </Button>
                                     <Button size="small" variant="outlined" startIcon={<LocalOffer />}
                                       onClick={(e) => { e.stopPropagation(); setTagDialog({ open: true, customerId: customer.id }); }}>
                                       Add Tag
@@ -204,6 +301,10 @@ const AdminCustomers = () => {
                                     <Button size="small" variant="outlined" startIcon={<AttachMoney />}
                                       onClick={(e) => { e.stopPropagation(); setCreditDialog({ open: true, customerId: customer.id }); }}>
                                       Add Credit
+                                    </Button>
+                                    <Button size="small" variant="outlined" color="error" startIcon={<Delete />}
+                                      onClick={(e) => { e.stopPropagation(); setDeleteDialog({ open: true, customer }); }}>
+                                      Delete
                                     </Button>
                                   </Box>
                                 </Grid>
@@ -249,6 +350,101 @@ const AdminCustomers = () => {
           </TableContainer>
         </Paper>
       )}
+
+      {/* New Customer Dialog */}
+      <Dialog open={newCustomerDialog} onClose={() => setNewCustomerDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add New Customer</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={6}>
+              <TextField fullWidth label="First Name" value={newCustomerForm.firstName}
+                onChange={handleNewCustomerChange('firstName')} required />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField fullWidth label="Last Name" value={newCustomerForm.lastName}
+                onChange={handleNewCustomerChange('lastName')} required />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="Email" type="email" value={newCustomerForm.email}
+                onChange={handleNewCustomerChange('email')} required />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="Phone" value={newCustomerForm.phone}
+                onChange={handleNewCustomerChange('phone')} />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth label="Notes" multiline rows={2} value={newCustomerForm.notes}
+                onChange={handleNewCustomerChange('notes')} />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewCustomerDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={createCustomer} disabled={newCustomerSaving}>
+            {newCustomerSaving ? 'Creating...' : 'Create Customer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={editDialog} onClose={() => { setEditDialog(false); setEditForm(null); }} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Customer</DialogTitle>
+        {editForm && (
+          <>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid item xs={6}>
+                  <TextField fullWidth label="First Name" value={editForm.firstName}
+                    onChange={handleEditChange('firstName')} required />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField fullWidth label="Last Name" value={editForm.lastName}
+                    onChange={handleEditChange('lastName')} required />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth label="Email" type="email" value={editForm.email}
+                    onChange={handleEditChange('email')} required />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth label="Phone" value={editForm.phone}
+                    onChange={handleEditChange('phone')} />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField fullWidth label="Notes" multiline rows={3} value={editForm.notes}
+                    onChange={handleEditChange('notes')} />
+                </Grid>
+              </Grid>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => { setEditDialog(false); setEditForm(null); }}>Cancel</Button>
+              <Button variant="contained" onClick={saveEdit} disabled={editSaving}>
+                {editSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, customer: null })} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Customer</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete{' '}
+            <strong>{deleteDialog.customer?.firstName} {deleteDialog.customer?.lastName}</strong>
+            {' '}({deleteDialog.customer?.email})?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            This action cannot be undone. Customers with existing orders cannot be deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog({ open: false, customer: null })}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Add Tag Dialog */}
       <Dialog open={tagDialog.open} onClose={() => setTagDialog({ open: false, customerId: null })} maxWidth="xs" fullWidth>

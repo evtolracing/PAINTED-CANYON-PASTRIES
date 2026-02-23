@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import {
   Save, Refresh, Settings, LocalShipping, Receipt, Email,
-  People, Add, Delete, Edit
+  People, Add, Delete, Edit, CloudUpload
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
@@ -27,6 +27,10 @@ const AdminSettings = () => {
     'bakery.name': 'Painted Canyon Pastries',
     'bakery.address': '', 'bakery.phone': '', 'bakery.email': '',
   });
+  const [bakeryLogo, setBakeryLogo] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  const API_HOST = process.env.REACT_APP_API_HOST || 'http://localhost:5000';
 
   // Delivery
   const [deliverySettings, setDeliverySettings] = useState({
@@ -54,6 +58,7 @@ const AdminSettings = () => {
         'bakery.phone': s['bakery.phone'] || '',
         'bakery.email': s['bakery.email'] || '',
       });
+      setBakeryLogo(s['bakery.logo'] || null);
       setDeliverySettings({
         'delivery.zipCodes': Array.isArray(s['delivery.zipCodes']) ? s['delivery.zipCodes'].join(', ') : (s['delivery.zipCodes'] || ''),
         'delivery.fee': s['delivery.fee'] || '5.00',
@@ -94,6 +99,37 @@ const AdminSettings = () => {
   };
 
   const saveBakeryInfo = () => saveSettings(bakeryInfo);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data: uploadData } = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const logoUrl = uploadData.data.url;
+      await api.put('/settings', { 'bakery.logo': logoUrl });
+      setBakeryLogo(logoUrl);
+      showSnackbar('Logo updated', 'success');
+    } catch (err) {
+      showSnackbar('Failed to upload logo', 'error');
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const removeLogo = async () => {
+    try {
+      await api.put('/settings', { 'bakery.logo': null });
+      setBakeryLogo(null);
+      showSnackbar('Logo removed', 'success');
+    } catch (err) {
+      showSnackbar('Failed to remove logo', 'error');
+    }
+  };
   const saveDeliverySettings = () => {
     const zipCodes = deliverySettings['delivery.zipCodes']
       .split(',').map(z => z.trim()).filter(Boolean);
@@ -148,6 +184,37 @@ const AdminSettings = () => {
             <Paper sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>Bakery Information</Typography>
               <Grid container spacing={2}>
+                {/* Logo Upload */}
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Company Logo</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    {bakeryLogo ? (
+                      <Box
+                        component="img"
+                        src={`${API_HOST}${bakeryLogo}`}
+                        alt="Company logo"
+                        sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+                      />
+                    ) : (
+                      <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '2px dashed', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CloudUpload sx={{ color: 'text.disabled' }} />
+                      </Box>
+                    )}
+                    <Box>
+                      <Button variant="outlined" component="label" size="small" startIcon={<CloudUpload />} disabled={logoUploading}>
+                        {logoUploading ? 'Uploading...' : 'Upload Logo'}
+                        <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                      </Button>
+                      {bakeryLogo && (
+                        <Button size="small" color="error" onClick={removeLogo} sx={{ ml: 1 }}>Remove</Button>
+                      )}
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Recommended: Square image, at least 128×128px. PNG or SVG preferred.
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Divider sx={{ mt: 2 }} />
+                </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField fullWidth label="Bakery Name" value={bakeryInfo['bakery.name']}
                     onChange={e => setBakeryInfo(b => ({ ...b, 'bakery.name': e.target.value }))} />

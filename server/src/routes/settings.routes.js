@@ -7,8 +7,9 @@ const { AppError } = require('../middleware/errorHandler');
 // GET /api/settings/public — public bakery info + hours (no auth required)
 router.get('/public', async (req, res, next) => {
   try {
-    const [bakeryInfo, storeHours] = await Promise.all([
+    const [bakeryInfo, bakeryLogo, storeHours] = await Promise.all([
       prisma.setting.findUnique({ where: { key: 'bakery_info' } }),
+      prisma.setting.findUnique({ where: { key: 'bakery.logo' } }),
       prisma.storeHours.findMany({ orderBy: { dayOfWeek: 'asc' } }),
     ]);
 
@@ -16,6 +17,7 @@ router.get('/public', async (req, res, next) => {
       success: true,
       data: {
         bakeryInfo: bakeryInfo?.value || {},
+        bakeryLogo: bakeryLogo?.value || null,
         storeHours: storeHours || [],
       },
     });

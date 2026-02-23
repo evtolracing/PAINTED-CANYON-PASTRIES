@@ -6,6 +6,37 @@ const { AppError } = require('../middleware/errorHandler');
 
 // ─── ADMIN ────────────────────────────────────────────────
 
+// POST /api/customers — create a new customer (admin)
+router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { firstName, lastName, email, phone, notes, tags } = req.body;
+
+    if (!firstName || !lastName || !email) {
+      throw new AppError('firstName, lastName, and email are required', 400);
+    }
+
+    // Check for duplicate email
+    const existing = await prisma.customer.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) throw new AppError('A customer with this email already exists', 409);
+
+    const customer = await prisma.customer.create({
+      data: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.toLowerCase().trim(),
+        phone: phone?.trim() || null,
+        notes: notes?.trim() || null,
+        tags: tags || [],
+        isGuest: false,
+      },
+    });
+
+    res.status(201).json({ success: true, data: customer });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/customers — list all customers
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
@@ -97,16 +128,24 @@ router.get('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), a
 router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, notes, tags } = req.body;
+    const { firstName, lastName, email, phone, notes, tags } = req.body;
 
     const existing = await prisma.customer.findUnique({ where: { id } });
     if (!existing) throw new AppError('Customer not found', 404);
 
     const updateData = {};
-    if (firstName !== undefined) updateData.firstName = firstName;
-    if (lastName !== undefined) updateData.lastName = lastName;
-    if (phone !== undefined) updateData.phone = phone;
-    if (notes !== undefined) updateData.notes = notes;
+    if (firstName !== undefined) updateData.firstName = firstName.trim();
+    if (lastName !== undefined) updateData.lastName = lastName.trim();
+    if (email !== undefined) {
+      const normalizedEmail = email.toLowerCase().trim();
+      if (normalizedEmail !== existing.email) {
+        const dup = await prisma.customer.findUnique({ where: { email: normalizedEmail } });
+        if (dup) throw new AppError('A customer with this email already exists', 409);
+      }
+      updateData.email = normalizedEmail;
+    }
+    if (phone !== undefined) updateData.phone = phone?.trim() || null;
+    if (notes !== undefined) updateData.notes = notes?.trim() || null;
     if (tags !== undefined) updateData.tags = tags;
 
     const customer = await prisma.customer.update({
@@ -115,6 +154,42 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), a
     });
 
     res.json({ success: true, data: customer });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/customers/:id — delete customer
+router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.customer.findUnique({
+      where: { id },
+      include: { _count: { select: { orders: true } } },
+    });
+    if (!existing) throw new AppError('Customer not found', 404);
+
+    if (existing._count.orders > 0) {
+      throw new AppError(
+        `Cannot delete customer with ${existing._count.orders} existing order(s). Remove or reassign orders first.`,
+        400
+      );
+    }
+
+    await prisma.customer.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'customer.deleted',
+        entityType: 'customer',
+        entityId: id,
+        metadata: { email: existing.email, name: `${existing.firstName} ${existing.lastName}` },
+      },
+    });
+
+    res.json({ success: true, message: 'Customer deleted' });
   } catch (error) {
     next(error);
   }

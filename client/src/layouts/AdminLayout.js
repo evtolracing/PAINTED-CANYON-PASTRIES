@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItem, ListItemButton,
@@ -12,6 +12,7 @@ import {
   PointOfSale, Restaurant
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 const DRAWER_WIDTH = 260;
 const API_HOST = process.env.REACT_APP_API_HOST || 'http://localhost:5000';
@@ -42,6 +43,13 @@ const AdminLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [bakeryLogo, setBakeryLogo] = useState(null);
+
+  useEffect(() => {
+    api.get('/settings/public').then(({ data }) => {
+      if (data.data?.bakeryLogo) setBakeryLogo(data.data.bakeryLogo);
+    }).catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -52,7 +60,16 @@ const AdminLayout = () => {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Logo */}
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 24 }} />
+        {bakeryLogo ? (
+          <Box
+            component="img"
+            src={`${API_HOST}${bakeryLogo}`}
+            alt="Logo"
+            sx={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 1 }}
+          />
+        ) : (
+          <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 24 }} />
+        )}
         <Box>
           <Typography sx={{ fontFamily: '"Playfair Display", serif', fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.2, color: 'secondary.main' }}>
             Painted Canyon
