@@ -11,15 +11,17 @@ try {
 }
 
 module.exports = (req, res) => {
-  // Debug: expose env check and any load error before Express middleware
   if (req.url && req.url.includes('_debug')) {
-    return res.writeHead(200, { 'Content-Type': 'application/json' }) ||
-      res.end(JSON.stringify({
-        ok: true,
-        nodeVersion: process.version,
-        loadError: loadError ? loadError.message : null,
-        env: { DB: !!process.env.DATABASE_URL, JWT: !!process.env.JWT_SECRET, NODE_ENV: process.env.NODE_ENV }
-      }));
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      ok: true,
+      nodeVersion: process.version,
+      url: req.url,
+      loadError: loadError ? loadError.message : null,
+      env: { DB: !!process.env.DATABASE_URL, JWT: !!process.env.JWT_SECRET, NODE_ENV: process.env.NODE_ENV }
+    }));
+    return;
   }
   return app(req, res);
 };
