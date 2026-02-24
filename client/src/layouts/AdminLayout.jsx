@@ -13,9 +13,9 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { getImageUrl } from '../utils/imageUrl';
 
 const DRAWER_WIDTH = 260;
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
 
 const menuItems = [
   { label: 'Dashboard', icon: <Dashboard />, path: '/admin' },
@@ -63,7 +63,7 @@ const AdminLayout = () => {
         {bakeryLogo ? (
           <Box
             component="img"
-            src={`${API_HOST}${bakeryLogo}`}
+            src={getImageUrl(bakeryLogo)}
             alt="Logo"
             sx={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 1 }}
           />
@@ -186,7 +186,7 @@ const AdminLayout = () => {
               onClick={(e) => setAnchorEl(e.currentTarget)}
             >
               <Avatar
-                src={user?.avatar ? `${API_HOST}${user.avatar}` : undefined}
+                src={getImageUrl(user?.avatar)}
                 sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.85rem' }}
               >
                 {user?.firstName?.[0]}{user?.lastName?.[0]}

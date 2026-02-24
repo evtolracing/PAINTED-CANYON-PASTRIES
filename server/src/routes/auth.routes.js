@@ -1,26 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const crypto = require('crypto');
 const authService = require('../services/auth.service');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { authLimiter } = require('../middleware/rateLimiter');
 const { registerSchema, loginSchema } = require('../validators/auth.validator');
 const prisma = require('../config/database');
+const { uploadToStorage, deleteFromStorage } = require('../config/storage');
 
-// ─── Avatar upload config ────────────────────────────────
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, './uploads'),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${req.user.id}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-  },
-});
-
+// ─── Avatar upload config (memory storage for Supabase) ──
 const avatarUpload = multer({
-  storage: avatarStorage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimetype)) {
       cb(null, true);
@@ -133,7 +124,14 @@ router.post('/avatar', authenticate, avatarUpload.single('avatar'), async (req, 
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
-    const avatarUrl = `/uploads/${req.file.filename}`;
+
+    // Delete old avatar if exists
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { avatar: true } });
+    if (currentUser?.avatar) {
+      await deleteFromStorage(currentUser.avatar);
+    }
+
+    const avatarUrl = await uploadToStorage(req.file, 'avatars');
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatar: avatarUrl },
@@ -148,6 +146,12 @@ router.post('/avatar', authenticate, avatarUpload.single('avatar'), async (req, 
 // DELETE /api/auth/avatar — remove profile image
 router.delete('/avatar', authenticate, async (req, res, next) => {
   try {
+    // Delete from Supabase Storage
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id }, select: { avatar: true } });
+    if (currentUser?.avatar) {
+      await deleteFromStorage(currentUser.avatar);
+    }
+
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatar: null },

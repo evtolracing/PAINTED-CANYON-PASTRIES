@@ -13,8 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import AIAssistantWidget from '../components/AIAssistantWidget';
 import api from '../services/api';
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+import { getImageUrl } from '../utils/imageUrl';
 
 const navLinks = [
   { label: 'Shop', path: '/shop' },
@@ -63,7 +62,7 @@ const PublicLayout = () => {
               {bakeryLogo ? (
                 <Box
                   component="img"
-                  src={`${API_HOST}${bakeryLogo}`}
+                  src={getImageUrl(bakeryLogo)}
                   alt="Logo"
                   sx={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 1 }}
                 />
@@ -135,7 +134,7 @@ const PublicLayout = () => {
                   <IconButton onClick={(e) => setUserMenuAnchor(e.currentTarget)} size="small">
                     {user.avatar ? (
                       <Avatar
-                        src={`${API_HOST}${user.avatar}`}
+                        src={getImageUrl(user.avatar)}
                         sx={{ width: 28, height: 28 }}
                       />
                     ) : (

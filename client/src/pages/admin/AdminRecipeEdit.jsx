@@ -12,8 +12,7 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const AdminRecipeEdit = () => {
   const { id } = useParams();
@@ -402,7 +401,7 @@ const AdminRecipeEdit = () => {
               <Box sx={{ position: 'relative', mb: 2 }}>
                 <Box
                   component="img"
-                  src={`${API_HOST}${form.imageUrl}`}
+                  src={getImageUrl(form.imageUrl)}
                   alt="Recipe"
                   sx={{ width: '100%', borderRadius: 2, maxHeight: 220, objectFit: 'cover' }}
                 />

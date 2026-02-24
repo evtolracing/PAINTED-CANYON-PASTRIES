@@ -11,8 +11,7 @@ import {
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useSnackbar } from '../../context/SnackbarContext';
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const AccountPage = () => {
   const navigate = useNavigate();
@@ -221,7 +220,7 @@ const AccountPage = () => {
                     }
                   >
                     <Avatar
-                      src={user?.avatar ? `${API_HOST}${user.avatar}` : undefined}
+                      src={getImageUrl(user?.avatar)}
                       sx={{
                         width: 88,
                         height: 88,

@@ -10,8 +10,7 @@ import {
 import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const BADGE_OPTIONS = ['Best Seller', 'New', 'Limited', 'Gluten-Free', 'Vegan', 'Seasonal', 'Staff Pick'];
 
@@ -424,7 +423,7 @@ const AdminProductEdit = () => {
               <ImageList cols={4} gap={8} sx={{ mb: 2 }}>
                 {productImages.map((img) => (
                   <ImageListItem key={img.id} sx={{ borderRadius: 2, overflow: 'hidden', border: img.isPrimary ? '2px solid' : '1px solid', borderColor: img.isPrimary ? 'primary.main' : 'divider' }}>
-                    <img src={`${API_HOST}${img.url}`} alt={img.alt || 'Product'} loading="lazy" style={{ height: 120, objectFit: 'cover' }} />
+                    <img src={getImageUrl(img.url)} alt={img.alt || 'Product'} loading="lazy" style={{ height: 120, objectFit: 'cover' }} />
                     <ImageListItemBar
                       sx={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
                       actionIcon={

@@ -12,8 +12,7 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const AdminRecipes = () => {
   const navigate = useNavigate();
@@ -175,7 +174,7 @@ const AdminRecipes = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <Avatar
-                        src={recipe.imageUrl ? `${API_HOST}${recipe.imageUrl}` : undefined}
+                        src={getImageUrl(recipe.imageUrl)}
                         variant="rounded"
                         sx={{ width: 40, height: 40, bgcolor: 'primary.light' }}
                       >

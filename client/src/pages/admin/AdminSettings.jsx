@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const AdminSettings = () => {
   const { showSnackbar } = useSnackbar();
@@ -30,7 +31,7 @@ const AdminSettings = () => {
   const [bakeryLogo, setBakeryLogo] = useState(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
-  const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000';
+
 
   // Delivery
   const [deliverySettings, setDeliverySettings] = useState({
@@ -191,7 +192,7 @@ const AdminSettings = () => {
                     {bakeryLogo ? (
                       <Box
                         component="img"
-                        src={`${API_HOST}${bakeryLogo}`}
+                        src={getImageUrl(bakeryLogo)}
                         alt="Company logo"
                         sx={{ width: 64, height: 64, objectFit: 'contain', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
                       />

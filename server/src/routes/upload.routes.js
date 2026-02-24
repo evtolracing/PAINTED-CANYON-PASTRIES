@@ -1,23 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const crypto = require('crypto');
 const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
+const { uploadToStorage } = require('../config/storage');
 
-// ─── MULTER CONFIGURATION ─────────────────────────────────
+// ─── MULTER CONFIGURATION (memory storage for Supabase) ───
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, './uploads');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = crypto.randomBytes(8).toString('hex');
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${uniqueSuffix}${ext}`);
-  },
-});
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
@@ -51,13 +41,13 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), upl
       throw new AppError('No file uploaded', 400);
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const publicUrl = await uploadToStorage(req.file, 'general');
 
     res.status(201).json({
       success: true,
       data: {
-        url: fileUrl,
-        filename: req.file.filename,
+        url: publicUrl,
+        filename: req.file.originalname,
         originalName: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
@@ -75,13 +65,18 @@ router.post('/multiple', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGE
       throw new AppError('No files uploaded', 400);
     }
 
-    const files = req.files.map((file) => ({
-      url: `/uploads/${file.filename}`,
-      filename: file.filename,
-      originalName: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size,
-    }));
+    const files = await Promise.all(
+      req.files.map(async (file) => {
+        const publicUrl = await uploadToStorage(file, 'general');
+        return {
+          url: publicUrl,
+          filename: file.originalname,
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+        };
+      })
+    );
 
     res.status(201).json({ success: true, data: files });
   } catch (error) {
