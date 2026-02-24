@@ -100,7 +100,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve React build
-const clientBuildPath = path.join(__dirname, '../../client/build');
+const clientBuildPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientBuildPath));
 app.get('*', (req, res, next) => {
   // Don't serve index.html for API routes
