@@ -10,3 +10,5 @@ Thumbs.db
 server/prisma/*.db
 server/uploads/*
 !server/uploads/.gitkeep
+.vercel
+.env*.local
