@@ -1,18 +1,25 @@
 require('dotenv').config();
 
 let app;
+let loadError = null;
 try {
   app = require('../server/src/app');
 } catch (err) {
   console.error('APP LOAD ERROR:', err);
-  app = (req, res) => res.status(500).json({ loadError: err.message, stack: err.stack });
+  loadError = err;
+  app = (req, res) => res.status(500).json({ loadError: err.message });
 }
 
-// Add an early error-exposing health check at the top
-const originalApp = app;
 module.exports = (req, res) => {
-  if (req.url === '/api/_debug') {
-    return res.status(200).json({ status: 'function ok', nodeVersion: process.version, env: { DB: !!process.env.DATABASE_URL, JWT: !!process.env.JWT_SECRET, NODE_ENV: process.env.NODE_ENV } });
+  // Debug: expose env check and any load error before Express middleware
+  if (req.url && req.url.includes('_debug')) {
+    return res.writeHead(200, { 'Content-Type': 'application/json' }) ||
+      res.end(JSON.stringify({
+        ok: true,
+        nodeVersion: process.version,
+        loadError: loadError ? loadError.message : null,
+        env: { DB: !!process.env.DATABASE_URL, JWT: !!process.env.JWT_SECRET, NODE_ENV: process.env.NODE_ENV }
+      }));
   }
-  return originalApp(req, res);
+  return app(req, res);
 };
