@@ -47,7 +47,7 @@ const RegisterPage = () => {
       showSnackbar('Account created! Welcome to Painted Canyon Pastries.', 'success');
       navigate('/account');
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'Registration failed. Please try again.', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Registration failed. Please try again.', 'error');
     } finally {
       setLoading(false);
     }

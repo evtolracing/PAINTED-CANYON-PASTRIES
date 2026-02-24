@@ -34,7 +34,7 @@ const LoginPage = () => {
       showSnackbar(`Welcome back, ${user.firstName || 'there'}!`, 'success');
       navigate(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER' ? '/admin' : '/shop');
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'Invalid email or password.', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Invalid email or password.', 'error');
     } finally {
       setLoading(false);
     }
