@@ -203,7 +203,7 @@ router.post('/orders', authenticate, async (req, res, next) => {
         data: {
           orderNumber,
           customerId,
-          status: isCashOrComp ? 'CONFIRMED' : 'NEW',
+          status: 'NEW',
           fulfillmentType,
           subtotal,
           taxAmount,

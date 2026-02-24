@@ -99,6 +99,21 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Painted Canyon Pastries API' });
 });
 
+// AI config diagnostic (admin only — no secrets exposed)
+app.get('/api/ai-status', (req, res) => {
+  const provider = process.env.AI_PROVIDER || 'openai';
+  res.json({
+    provider: provider.trim(),
+    chatModel: (process.env.AI_CHAT_MODEL || 'default').trim(),
+    embeddingModel: (process.env.AI_EMBEDDING_MODEL || 'default').trim(),
+    hasDeepSeekKey: !!process.env.DEEPSEEK_API_KEY?.trim(),
+    hasOpenAIKey: !!process.env.OPENAI_API_KEY?.trim(),
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY?.trim(),
+    deepseekKeyPrefix: process.env.DEEPSEEK_API_KEY?.trim()?.substring(0, 6) || 'not set',
+    openaiKeyPrefix: process.env.OPENAI_API_KEY?.trim()?.substring(0, 8) || 'not set',
+  });
+});
+
 // Serve React build
 const clientBuildPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientBuildPath));

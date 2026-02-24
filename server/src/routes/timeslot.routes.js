@@ -117,6 +117,79 @@ router.get('/blackout-dates', async (req, res, next) => {
 
 // ─── ADMIN ────────────────────────────────────────────────
 
+// PUT /api/timeslots/store-hours — upsert store hours (admin)
+router.put('/store-hours', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { hours } = req.body;
+    if (!Array.isArray(hours) || hours.length === 0) {
+      throw new AppError('hours array is required', 400);
+    }
+
+    const results = [];
+    for (const h of hours) {
+      if (h.dayOfWeek === undefined || h.dayOfWeek < 0 || h.dayOfWeek > 6) {
+        throw new AppError('Each entry must have a valid dayOfWeek (0-6)', 400);
+      }
+      const record = await prisma.storeHours.upsert({
+        where: { dayOfWeek: h.dayOfWeek },
+        update: {
+          openTime: h.openTime || '07:00',
+          closeTime: h.closeTime || '18:00',
+          isClosed: h.isClosed ?? false,
+        },
+        create: {
+          dayOfWeek: h.dayOfWeek,
+          openTime: h.openTime || '07:00',
+          closeTime: h.closeTime || '18:00',
+          isClosed: h.isClosed ?? false,
+        },
+      });
+      results.push(record);
+    }
+
+    res.json({ success: true, data: results });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/timeslots/blackout-dates — create blackout date (admin)
+router.post('/blackout-dates', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { date, reason } = req.body;
+    if (!date) throw new AppError('date is required', 400);
+
+    const blackout = await prisma.blackoutDate.create({
+      data: {
+        date: new Date(date),
+        reason: reason || null,
+      },
+    });
+
+    res.status(201).json({ success: true, data: blackout });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return next(new AppError('A blackout date already exists for this date', 409));
+    }
+    next(error);
+  }
+});
+
+// DELETE /api/timeslots/blackout-dates/:id — remove blackout date (admin)
+router.delete('/blackout-dates/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.blackoutDate.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Blackout date not found', 404);
+
+    await prisma.blackoutDate.delete({ where: { id } });
+    res.json({ success: true, message: 'Blackout date removed' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/timeslots — create single timeslot
 router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {

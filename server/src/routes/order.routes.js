@@ -197,7 +197,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
     // ── Create order in a transaction ──
     const isCashOrComp = effectivePayment === 'CASH' || effectivePayment === 'COMP';
     const skipStripe = !stripeConfigured && (effectivePayment === 'STRIPE_CARD' || effectivePayment === 'STRIPE_TERMINAL');
-    const autoConfirm = isCashOrComp || skipStripe;
+    const paidUpFront = isCashOrComp || skipStripe;
     const orderSrc = source || 'web';
 
     const result = await prisma.$transaction(async (tx) => {
@@ -207,7 +207,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
         data: {
           orderNumber,
           customerId,
-          status: autoConfirm ? 'CONFIRMED' : 'NEW',
+          status: 'NEW',
           fulfillmentType,
           subtotal,
           taxAmount,
@@ -217,8 +217,8 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
           totalAmount,
           paymentMethod: effectivePayment,
           stripePaymentId,
-          isPaid: autoConfirm,
-          paidAt: autoConfirm ? new Date() : null,
+          isPaid: paidUpFront,
+          paidAt: paidUpFront ? new Date() : null,
           scheduledDate: scheduledDate ? new Date(scheduledDate) : null,
           timeslotId: timeslotId || null,
           scheduledSlot: timeslotId ? undefined : null,
@@ -381,6 +381,7 @@ router.get('/', authenticate, async (req, res, next) => {
         include: {
           customer: { select: { id: true, firstName: true, lastName: true, email: true } },
           items: { include: { product: { select: { id: true, name: true } }, variant: true } },
+          timeslot: { select: { id: true, startTime: true, endTime: true, type: true } },
         },
         orderBy: { [orderField]: sortDir === 'asc' ? 'asc' : 'desc' },
         skip,
@@ -439,6 +440,36 @@ router.get('/:id', authenticate, async (req, res, next) => {
 });
 
 // ─── ADMIN ────────────────────────────────────────────────
+
+// PATCH /api/orders/:id/reschedule — move order to a new date (drag & drop)
+router.patch('/:id/reschedule', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { scheduledDate } = req.body;
+
+    if (!scheduledDate) throw new AppError('scheduledDate is required', 400);
+
+    const existing = await prisma.order.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Order not found', 404);
+
+    if (['COMPLETED', 'CANCELLED', 'REFUNDED'].includes(existing.status)) {
+      throw new AppError(`Cannot reschedule a ${existing.status.toLowerCase()} order`, 400);
+    }
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: { scheduledDate: new Date(scheduledDate) },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // PATCH /api/orders/:id/status
 router.patch('/:id/status', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER', 'BAKER'), validate(updateOrderStatusSchema), async (req, res, next) => {

@@ -153,7 +153,7 @@ const AdminRecipeEdit = () => {
       showSnackbar('Recipe generated! Review and edit before saving.', 'success');
       setShowAIPanel(false);
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'AI generation failed', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'AI generation failed', 'error');
     } finally {
       setGenerating(false);
     }

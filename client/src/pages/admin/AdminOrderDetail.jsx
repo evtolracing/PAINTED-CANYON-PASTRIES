@@ -219,10 +219,20 @@ const AdminOrderDetail = () => {
               </Grid>
               {order.scheduledDate && (
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="caption" color="text.secondary">Scheduled</Typography>
+                  <Typography variant="caption" color="text.secondary">Scheduled Date</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{new Date(order.scheduledDate).toLocaleDateString()}</Typography>
                 </Grid>
               )}
+              <Grid item xs={6} sm={3}>
+                <Typography variant="caption" color="text.secondary">
+                  {order.fulfillmentType === 'DELIVERY' ? 'Delivery Time' : 'Pickup Time'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {order.timeslot
+                    ? `${order.timeslot.startTime} – ${order.timeslot.endTime}`
+                    : order.scheduledSlot || 'Not set'}
+                </Typography>
+              </Grid>
               {order.deliveryAddress && (
                 <Grid item xs={12}>
                   <Typography variant="caption" color="text.secondary">Delivery Address</Typography>

@@ -96,6 +96,47 @@ router.post('/ingest/all', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), asyn
   }
 });
 
+// GET /api/ai/queries — query history (admin)
+router.get('/queries', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { limit = 20, page = 1, context } = req.query;
+
+    const where = {};
+    if (context) where.context = context;
+
+    const take = parseInt(limit);
+    const skip = (parseInt(page) - 1) * take;
+
+    const [queries, total] = await Promise.all([
+      prisma.aiQuery.findMany({
+        where,
+        select: {
+          id: true,
+          query: true,
+          response: true,
+          context: true,
+          safetyFlags: true,
+          feedbackRating: true,
+          createdAt: true,
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.aiQuery.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: queries,
+      meta: { total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/ai/documents — list AI documents (admin)
 router.get('/documents', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {

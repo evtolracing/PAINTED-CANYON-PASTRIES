@@ -7,16 +7,31 @@ const { AppError } = require('../middleware/errorHandler');
 // GET /api/settings/public — public bakery info + hours (no auth required)
 router.get('/public', async (req, res, next) => {
   try {
-    const [bakeryInfo, bakeryLogo, storeHours] = await Promise.all([
-      prisma.setting.findUnique({ where: { key: 'bakery_info' } }),
+    const [bakerySettings, bakeryLogo, storeHours] = await Promise.all([
+      prisma.setting.findMany({
+        where: {
+          key: { in: ['bakery_info', 'bakery.name', 'bakery.address', 'bakery.phone', 'bakery.email'] },
+        },
+      }),
       prisma.setting.findUnique({ where: { key: 'bakery.logo' } }),
       prisma.storeHours.findMany({ orderBy: { dayOfWeek: 'asc' } }),
     ]);
 
+    // Build bakeryInfo from individual keys, falling back to legacy bakery_info object
+    const settingsMap = Object.fromEntries(bakerySettings.map(s => [s.key, s.value]));
+    const legacyInfo = (typeof settingsMap['bakery_info'] === 'object' && settingsMap['bakery_info']) || {};
+
+    const bakeryInfo = {
+      name: settingsMap['bakery.name'] || legacyInfo.name || 'Painted Canyon Pastries',
+      address: settingsMap['bakery.address'] || legacyInfo.address || '',
+      phone: settingsMap['bakery.phone'] || legacyInfo.phone || '',
+      email: settingsMap['bakery.email'] || legacyInfo.email || '',
+    };
+
     res.json({
       success: true,
       data: {
-        bakeryInfo: bakeryInfo?.value || {},
+        bakeryInfo,
         bakeryLogo: bakeryLogo?.value || null,
         storeHours: storeHours || [],
       },

@@ -30,7 +30,7 @@ const errorHandler = (err, req, res, _next) => {
   }
 
   const statusCode = err.statusCode || 500;
-  const message = err.isOperational ? err.message : 'Internal server error';
+  const message = err.isOperational ? err.message : (process.env.NODE_ENV?.trim() !== 'production' ? err.message : 'Internal server error');
 
   logger.error(`[${requestId}] ${statusCode} - ${err.message}`, {
     stack: err.stack,

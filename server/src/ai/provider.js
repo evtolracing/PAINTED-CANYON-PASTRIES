@@ -15,6 +15,7 @@ class OpenAIProvider extends AIProvider {
   constructor(config = {}) {
     super(config);
     this.apiKey = config.apiKey || process.env.OPENAI_API_KEY;
+    if (!this.apiKey) throw new Error('OpenAI API key is not configured. Set OPENAI_API_KEY environment variable.');
     this.chatModel = config.chatModel || process.env.AI_CHAT_MODEL || 'gpt-4o-mini';
     this.embeddingModel = config.embeddingModel || process.env.AI_EMBEDDING_MODEL || 'text-embedding-3-small';
   }
@@ -73,6 +74,7 @@ class DeepSeekProvider extends AIProvider {
   constructor(config = {}) {
     super(config);
     this.apiKey = config.apiKey || process.env.DEEPSEEK_API_KEY;
+    if (!this.apiKey) throw new Error('DeepSeek API key is not configured. Set DEEPSEEK_API_KEY environment variable.');
     this.chatModel = config.chatModel || process.env.AI_CHAT_MODEL || 'deepseek-chat';
     this.baseUrl = config.baseUrl || 'https://api.deepseek.com';
   }
@@ -118,9 +120,10 @@ class AnthropicProvider extends AIProvider {
   constructor(config = {}) {
     super(config);
     this.apiKey = config.apiKey || process.env.ANTHROPIC_API_KEY;
+    if (!this.apiKey) throw new Error('Anthropic API key is not configured. Set ANTHROPIC_API_KEY environment variable.');
     this.chatModel = config.chatModel || 'claude-sonnet-4-20250514';
     // Anthropic doesn't have embeddings - fall back to OpenAI for embeddings
-    this.embeddingProvider = new OpenAIProvider(config);
+    this.embeddingProvider = process.env.OPENAI_API_KEY ? new OpenAIProvider(config) : null;
   }
 
   async chat(messages, options = {}) {
@@ -157,6 +160,7 @@ class AnthropicProvider extends AIProvider {
   }
 
   async embed(text) {
+    if (!this.embeddingProvider) throw new Error('Embedding not supported by Anthropic and no OPENAI_API_KEY configured for fallback');
     return this.embeddingProvider.embed(text);
   }
 }

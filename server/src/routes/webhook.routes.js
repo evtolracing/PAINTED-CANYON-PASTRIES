@@ -35,7 +35,6 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             data: {
               isPaid: true,
               paidAt: new Date(),
-              status: order.status === 'NEW' ? 'CONFIRMED' : order.status,
             },
           });
           logger.info(`Order ${order.orderNumber} marked as paid`);

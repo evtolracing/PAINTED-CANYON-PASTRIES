@@ -166,7 +166,13 @@ router.post('/generate', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGE
     const { prompt } = req.body;
     if (!prompt) throw new AppError('Prompt is required', 400);
 
-    const provider = getProvider();
+    let provider;
+    try {
+      provider = getProvider();
+    } catch (configErr) {
+      logger.error(`AI provider configuration error: ${configErr.message}`);
+      throw new AppError(`AI is not configured: ${configErr.message}`, 503);
+    }
 
     const messages = [
       {
@@ -194,10 +200,16 @@ Keep the recipe professional, accurate, and suited for a commercial bakery. Use 
       { role: 'user', content: prompt },
     ];
 
-    const result = await provider.chat(messages, {
-      temperature: 0.7,
-      maxTokens: 2048,
-    });
+    let result;
+    try {
+      result = await provider.chat(messages, {
+        temperature: 0.7,
+        maxTokens: 2048,
+      });
+    } catch (chatErr) {
+      logger.error(`AI chat error: ${chatErr.message}`);
+      throw new AppError(`AI provider error: ${chatErr.message}`, 502);
+    }
 
     // Parse the JSON response
     let recipe;
@@ -207,7 +219,7 @@ Keep the recipe professional, accurate, and suited for a commercial bakery. Use 
       content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '');
       recipe = JSON.parse(content);
     } catch (parseErr) {
-      logger.error(`AI recipe parse error: ${parseErr.message}`);
+      logger.error(`AI recipe parse error: ${parseErr.message}`, { rawContent: result.content?.substring(0, 500) });
       throw new AppError('AI generated an invalid recipe format. Please try again.', 500);
     }
 
