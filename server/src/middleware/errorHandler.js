@@ -43,8 +43,7 @@ const errorHandler = (err, req, res, _next) => {
     error: {
       message,
       ...(err.details && { details: err.details }),
-      // Always expose debug info to find the Vercel issue
-      _debug: { actualMessage: err.message, stack: err.stack },
+      ...(process.env.NODE_ENV?.trim() === 'development' && { stack: err.stack }),
     },
     requestId,
   });

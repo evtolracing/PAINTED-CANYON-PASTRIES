@@ -1,27 +1,4 @@
 require('dotenv').config();
+const app = require('../server/src/app');
 
-let app;
-let loadError = null;
-try {
-  app = require('../server/src/app');
-} catch (err) {
-  console.error('APP LOAD ERROR:', err);
-  loadError = err;
-  app = (req, res) => res.status(500).json({ loadError: err.message });
-}
-
-module.exports = (req, res) => {
-  if (req.url && req.url.includes('_debug')) {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      ok: true,
-      nodeVersion: process.version,
-      url: req.url,
-      loadError: loadError ? loadError.message : null,
-      env: { DB: !!process.env.DATABASE_URL, JWT: !!process.env.JWT_SECRET, NODE_ENV: process.env.NODE_ENV }
-    }));
-    return;
-  }
-  return app(req, res);
-};
+module.exports = app;
