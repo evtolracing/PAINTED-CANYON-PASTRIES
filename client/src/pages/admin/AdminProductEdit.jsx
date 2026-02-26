@@ -268,6 +268,7 @@ const AdminProductEdit = () => {
   }
 
   return (
+    <>
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -623,6 +624,7 @@ const AdminProductEdit = () => {
         </Button>
       </DialogActions>
     </Dialog>
+    </>
   );
 };
 

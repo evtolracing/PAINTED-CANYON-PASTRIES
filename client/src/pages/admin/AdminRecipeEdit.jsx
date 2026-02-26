@@ -269,6 +269,7 @@ const AdminRecipeEdit = () => {
   }
 
   return (
+    <>
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -613,6 +614,7 @@ const AdminRecipeEdit = () => {
         </Button>
       </DialogActions>
     </Dialog>
+    </>
   );
 };
 
