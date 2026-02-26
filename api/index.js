@@ -36,12 +36,14 @@ let app;
 try {
   app = require('../server/src/app');
 } catch (err) {
-  console.error('FATAL: Failed to load app module:', err.message);
-  console.error(err.stack);
+  const errMsg = err.message || 'Unknown error';
+  const errStack = err.stack || '';
+  console.error('FATAL: Failed to load app module:', errMsg);
+  console.error(errStack);
   app = (req, res) => {
     res.status(500).json({
       success: false,
-      error: { message: 'App failed to initialize. Check Vercel function logs for details.' },
+      error: { message: `App failed to initialize: ${errMsg}` },
     });
   };
 }
