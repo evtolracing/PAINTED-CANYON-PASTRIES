@@ -222,14 +222,14 @@ class GeminiProvider extends AIProvider {
 }
 
 /**
- * Generate an image using Gemini 2.0 Flash image generation.
+ * Generate an image using Gemini 2.5 Flash image generation.
  * Returns { data: base64String, mimeType: 'image/png' }
  */
 async function generateImageWithGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const model = 'gemini-2.0-flash-preview-image-generation';
+  const model = 'gemini-2.5-flash-image';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
