@@ -245,6 +245,16 @@ const AdminProductEdit = () => {
           setPendingFiles([]);
         }
 
+        // Attach any AI-generated images (stored as URL references)
+        const aiImages = productImages.filter(img => img.isAI && img.url);
+        for (const aiImg of aiImages) {
+          try {
+            await api.post(`/products/${newProductId}/images/url`, { url: aiImg.url, isPrimary: aiImg.isPrimary });
+          } catch {
+            showSnackbar('Product created but an AI image failed to attach', 'warning');
+          }
+        }
+
         showSnackbar('Product created!', 'success');
         navigate(`/admin/products/${newProductId}/edit`);
       } else {

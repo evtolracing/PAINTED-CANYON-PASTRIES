@@ -328,6 +328,34 @@ router.post('/:id/images', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANA
   }
 });
 
+// POST /api/products/:id/images/url — attach an image by URL (e.g. AI-generated)
+router.post('/:id/images/url', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { url, alt, isPrimary } = req.body;
+    if (!url) throw new AppError('url is required', 400);
+
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) throw new AppError('Product not found', 404);
+
+    const existingCount = await prisma.productImage.count({ where: { productId: id } });
+
+    const image = await prisma.productImage.create({
+      data: {
+        productId: id,
+        url,
+        alt: alt || product.name,
+        isPrimary: isPrimary ?? existingCount === 0,
+        sortOrder: existingCount,
+      },
+    });
+
+    res.status(201).json({ success: true, data: image });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // PUT /api/products/:id/images/:imageId/primary — set as primary image
 router.put('/:id/images/:imageId/primary', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {

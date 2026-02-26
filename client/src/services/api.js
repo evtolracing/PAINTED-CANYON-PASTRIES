@@ -17,7 +17,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: handle token refresh
+// Response interceptor: handle token refresh with lock to avoid race conditions
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -32,6 +46,18 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // If a refresh is already in progress, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        });
+      }
+
+      isRefreshing = true;
+
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         if (!refreshToken) throw new Error('No refresh token');
@@ -42,20 +68,24 @@ api.interceptors.response.use(
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', newRefreshToken);
 
+        processQueue(null, accessToken);
+
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
+        processQueue(refreshError, null);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         // Only redirect to login if we're not already on a public page
-        // This prevents losing cart/checkout progress
         const publicPaths = ['/shop', '/cart', '/checkout', '/product', '/', '/about', '/faq', '/contact', '/catering'];
         const isPublicPage = publicPaths.some(p => window.location.pathname.startsWith(p)) || window.location.pathname === '/';
         if (!isPublicPage) {
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 
