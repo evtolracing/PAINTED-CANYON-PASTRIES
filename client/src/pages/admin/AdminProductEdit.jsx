@@ -5,9 +5,9 @@ import {
   Select, FormControl, InputLabel, Chip, Switch, FormControlLabel, Divider,
   CircularProgress, IconButton, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Checkbox, OutlinedInput, ImageList, ImageListItem,
-  ImageListItemBar
+  ImageListItemBar, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
-import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder } from '@mui/icons-material';
+import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder, AutoAwesome } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
 import { getImageUrl } from '../../utils/imageUrl';
@@ -39,6 +39,10 @@ const AdminProductEdit = () => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const imageInputRef = useRef(null);
+
+  const [aiImageDialog, setAiImageDialog] = useState(false);
+  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -167,6 +171,32 @@ const AdminProductEdit = () => {
       showSnackbar('Image deleted', 'success');
     } catch {
       showSnackbar('Failed to delete image', 'error');
+    }
+  };
+
+  const handleAIGenerateImage = async () => {
+    if (!aiImagePrompt.trim()) return;
+    setGeneratingImage(true);
+    try {
+      const { data } = await api.post('/ai/generate-image', { prompt: aiImagePrompt.trim() });
+      const generatedUrl = data.data?.url;
+      if (!generatedUrl) throw new Error('No URL returned');
+
+      if (isNew) {
+        // For new products, add as a pending "url" entry (no file, just URL) — handled at save time
+        setProductImages(prev => [...prev, { id: `ai-${Date.now()}`, url: generatedUrl, isPrimary: prev.length === 0, isAI: true }]);
+      } else {
+        // For existing products, attach via the images endpoint
+        const { data: imgData } = await api.post(`/products/${id}/images/url`, { url: generatedUrl });
+        setProductImages(prev => [...prev, ...(imgData.data ? [imgData.data] : [{ id: `ai-${Date.now()}`, url: generatedUrl, isPrimary: false }])]);
+      }
+      showSnackbar('AI image generated!', 'success');
+      setAiImageDialog(false);
+      setAiImagePrompt('');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Image generation failed', 'error');
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -493,6 +523,14 @@ const AdminProductEdit = () => {
               style={{ display: 'none' }}
               onChange={handleImageUpload}
             />
+            <Button
+              fullWidth variant="outlined" size="small"
+              startIcon={<AutoAwesome />}
+              onClick={() => { setAiImagePrompt(form.name ? `A beautiful bakery photo of ${form.name}, artisan pastry, warm lighting, professional food photography` : ''); setAiImageDialog(true); }}
+              sx={{ mt: 1.5, borderColor: 'secondary.main', color: 'secondary.main', '&:hover': { borderColor: 'secondary.dark', bgcolor: 'rgba(196,149,106,0.06)' } }}
+            >
+              Generate with AI
+            </Button>
           </Paper>
         </Grid>
 
@@ -555,6 +593,36 @@ const AdminProductEdit = () => {
         </Grid>
       </Grid>
     </Container>
+
+    {/* AI Image Generation Dialog */}
+    <Dialog open={aiImageDialog} onClose={() => setAiImageDialog(false)} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <AutoAwesome sx={{ color: 'secondary.main' }} /> Generate Product Image with AI
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Describe the image you want Gemini AI to create. Be specific about style, lighting, and presentation.
+        </Typography>
+        <TextField
+          fullWidth multiline rows={4} label="Image Prompt"
+          value={aiImagePrompt}
+          onChange={e => setAiImagePrompt(e.target.value)}
+          placeholder="e.g. A beautiful artisan sourdough loaf on a rustic wooden board, warm studio lighting, professional food photography"
+          sx={{ mt: 1 }}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => setAiImageDialog(false)} disabled={generatingImage}>Cancel</Button>
+        <Button
+          variant="contained" onClick={handleAIGenerateImage}
+          disabled={generatingImage || !aiImagePrompt.trim()}
+          startIcon={generatingImage ? <CircularProgress size={16} /> : <AutoAwesome />}
+          sx={{ bgcolor: 'secondary.main', '&:hover': { bgcolor: 'secondary.dark' } }}
+        >
+          {generatingImage ? 'Generating...' : 'Generate Image'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

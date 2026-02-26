@@ -165,6 +165,98 @@ class AnthropicProvider extends AIProvider {
   }
 }
 
+class GeminiProvider extends AIProvider {
+  constructor(config = {}) {
+    super(config);
+    this.apiKey = config.apiKey || process.env.GEMINI_API_KEY;
+    if (!this.apiKey) throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY environment variable.');
+    this.chatModel = config.chatModel || process.env.AI_CHAT_MODEL || 'gemini-1.5-flash';
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  }
+
+  async chat(messages, options = {}) {
+    const systemMsg = messages.find(m => m.role === 'system');
+    const convMessages = messages.filter(m => m.role !== 'system');
+
+    const contents = convMessages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const body = {
+      contents,
+      generationConfig: {
+        temperature: options.temperature ?? 0.7,
+        maxOutputTokens: options.maxTokens || 1024,
+      },
+    };
+    if (systemMsg) {
+      body.systemInstruction = { parts: [{ text: systemMsg.content }] };
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/models/${options.model || this.chatModel}:generateContent?key=${this.apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API error: ${err.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text || '',
+      usage: data.usageMetadata,
+    };
+  }
+
+  async embed(text) {
+    // Fall back to OpenAI for embeddings (pgvector dimension compatibility)
+    if (process.env.OPENAI_API_KEY) {
+      const fallback = new OpenAIProvider();
+      return fallback.embed(text);
+    }
+    throw new Error('No OPENAI_API_KEY configured for embeddings (Gemini embeddings use different dimensions)');
+  }
+}
+
+/**
+ * Generate an image using Gemini 2.0 Flash image generation.
+ * Returns { data: base64String, mimeType: 'image/png' }
+ */
+async function generateImageWithGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  const model = 'gemini-2.0-flash-preview-image-generation';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`Gemini image generation error: ${err.error?.message || response.statusText}`);
+  }
+
+  const result = await response.json();
+  const parts = result.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find(p => p.inlineData);
+  if (!imagePart) throw new Error('No image returned by Gemini. The prompt may have been blocked.');
+
+  return {
+    data: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || 'image/png',
+  };
+}
+
 const getProvider = (providerName) => {
   const name = providerName || process.env.AI_PROVIDER || 'openai';
   switch (name.toLowerCase()) {
@@ -172,10 +264,12 @@ const getProvider = (providerName) => {
       return new DeepSeekProvider();
     case 'anthropic':
       return new AnthropicProvider();
+    case 'gemini':
+      return new GeminiProvider();
     case 'openai':
     default:
       return new OpenAIProvider();
   }
 };
 
-module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, DeepSeekProvider, getProvider };
+module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, DeepSeekProvider, GeminiProvider, getProvider, generateImageWithGemini };

@@ -4,7 +4,8 @@ import {
   Container, Box, Typography, Button, Paper, TextField, Grid, Divider,
   FormControl, InputLabel, Select, MenuItem, Chip, Switch, FormControlLabel,
   IconButton, Avatar, CircularProgress, Alert, Card, CardContent,
-  List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction
+  List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import {
   Save, ArrowBack, AutoAwesome, CloudUpload, Restaurant,
@@ -32,6 +33,9 @@ const AdminRecipeEdit = () => {
   const [showAIPanel, setShowAIPanel] = useState(showAI);
   const [uploading, setUploading] = useState({ image: false, doc: false });
   const [tagInput, setTagInput] = useState('');
+  const [aiImageDialog, setAiImageDialog] = useState(false);
+  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
@@ -213,6 +217,24 @@ const AdminRecipeEdit = () => {
       ...prev,
       documents: prev.documents.filter((_, i) => i !== index),
     }));
+  };
+
+  const handleAIGenerateImage = async () => {
+    if (!aiImagePrompt.trim()) return;
+    setGeneratingImage(true);
+    try {
+      const { data } = await api.post('/ai/generate-image', { prompt: aiImagePrompt.trim() });
+      const generatedUrl = data.data?.url;
+      if (!generatedUrl) throw new Error('No URL returned');
+      setForm((prev) => ({ ...prev, imageUrl: generatedUrl }));
+      showSnackbar('AI image generated!', 'success');
+      setAiImageDialog(false);
+      setAiImagePrompt('');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Image generation failed', 'error');
+    } finally {
+      setGeneratingImage(false);
+    }
   };
 
   const handleAddTag = () => {
@@ -459,6 +481,14 @@ const AdminRecipeEdit = () => {
                 Replace Image
               </Button>
             )}
+            <Button
+              fullWidth variant="outlined" size="small"
+              startIcon={<AutoAwesome />}
+              onClick={() => { setAiImagePrompt(form.title ? `A beautiful food photography of ${form.title}, professional bakery recipe photo, warm lighting, rustic presentation` : ''); setAiImageDialog(true); }}
+              sx={{ mt: 1, borderColor: 'secondary.main', color: 'secondary.main', '&:hover': { borderColor: 'secondary.dark', bgcolor: 'rgba(196,149,106,0.06)' } }}
+            >
+              Generate with AI
+            </Button>
           </Paper>
 
           {/* Recipe Documents */}
@@ -553,6 +583,36 @@ const AdminRecipeEdit = () => {
         </Grid>
       </Grid>
     </Container>
+
+    {/* AI Image Generation Dialog */}
+    <Dialog open={aiImageDialog} onClose={() => setAiImageDialog(false)} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <AutoAwesome sx={{ color: 'secondary.main' }} /> Generate Recipe Image with AI
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Describe the image you want Gemini AI to create for this recipe.
+        </Typography>
+        <TextField
+          fullWidth multiline rows={4} label="Image Prompt"
+          value={aiImagePrompt}
+          onChange={e => setAiImagePrompt(e.target.value)}
+          placeholder="e.g. A rustic sourdough loaf sliced on a wooden cutting board with a linen cloth, warm natural lighting"
+          sx={{ mt: 1 }}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={() => setAiImageDialog(false)} disabled={generatingImage}>Cancel</Button>
+        <Button
+          variant="contained" onClick={handleAIGenerateImage}
+          disabled={generatingImage || !aiImagePrompt.trim()}
+          startIcon={generatingImage ? <CircularProgress size={16} /> : <AutoAwesome />}
+          sx={{ bgcolor: 'secondary.main', '&:hover': { bgcolor: 'secondary.dark' } }}
+        >
+          {generatingImage ? 'Generating...' : 'Generate Image'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

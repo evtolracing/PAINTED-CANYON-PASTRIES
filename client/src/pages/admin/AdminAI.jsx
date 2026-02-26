@@ -3,11 +3,11 @@ import {
   Container, Box, Typography, Paper, Button, TextField, Grid, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, Chip,
   IconButton, Skeleton, Divider, LinearProgress, Card, CardContent,
-  Alert
+  Alert, CardMedia
 } from '@mui/material';
 import {
   Refresh, CloudUpload, SmartToy, Search, Description,
-  Send, Psychology, DataObject
+  Send, Psychology, DataObject, AutoAwesome
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
@@ -26,6 +26,11 @@ const AdminAI = () => {
   const [testQuery, setTestQuery] = useState('');
   const [testResponse, setTestResponse] = useState(null);
   const [querying, setQuerying] = useState(false);
+
+  // Image generation test
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [generatedImageUrl, setGeneratedImageUrl] = useState(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   // Query history
   const [queryHistory, setQueryHistory] = useState([]);
@@ -118,6 +123,21 @@ const AdminAI = () => {
       showSnackbar('Query failed', 'error');
     } finally {
       setQuerying(false);
+    }
+  };
+
+  const generateTestImage = async () => {
+    if (!imagePrompt.trim()) return;
+    setGeneratingImage(true);
+    setGeneratedImageUrl(null);
+    try {
+      const { data } = await api.post('/ai/generate-image', { prompt: imagePrompt.trim() });
+      setGeneratedImageUrl(data.data?.url);
+      showSnackbar('Image generated!', 'success');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Image generation failed', 'error');
+    } finally {
+      setGeneratingImage(false);
     }
   };
 
@@ -221,6 +241,56 @@ const AdminAI = () => {
                       Safety flags triggered: {Object.entries(testResponse.safetyFlags).filter(([, v]) => v).map(([k]) => k).join(', ')}
                     </Alert>
                   )}
+                </CardContent>
+              </Card>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Image Generation Test */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AutoAwesome /> Gemini Image Generation
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Generate AI images from text prompts using Google Gemini. Generated images are saved to storage and can be used anywhere in the app.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField
+                fullWidth size="small"
+                placeholder="Describe the image you want to generate..."
+                value={imagePrompt}
+                onChange={e => setImagePrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && generateTestImage()}
+              />
+              <Button
+                variant="contained" onClick={generateTestImage}
+                disabled={generatingImage || !imagePrompt.trim()}
+                startIcon={generatingImage ? <LinearProgress sx={{ width: 16 }} /> : <AutoAwesome />}
+                sx={{ whiteSpace: 'nowrap', bgcolor: 'secondary.main', '&:hover': { bgcolor: 'secondary.dark' } }}
+              >
+                {generatingImage ? 'Generating...' : 'Generate'}
+              </Button>
+            </Box>
+            {generatingImage && <LinearProgress sx={{ mb: 2 }} />}
+            {generatedImageUrl && (
+              <Card variant="outlined" sx={{ maxWidth: 400 }}>
+                <CardMedia
+                  component="img"
+                  image={generatedImageUrl}
+                  alt="AI Generated"
+                  sx={{ maxHeight: 300, objectFit: 'contain', bgcolor: 'grey.100' }}
+                />
+                <CardContent sx={{ py: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                    {generatedImageUrl}
+                  </Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Button size="small" href={generatedImageUrl} target="_blank" rel="noopener">
+                      Open Full Size
+                    </Button>
+                  </Box>
                 </CardContent>
               </Card>
             )}

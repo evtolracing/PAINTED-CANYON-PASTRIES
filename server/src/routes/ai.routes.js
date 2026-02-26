@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { processQuery } = require('../ai/query');
+const { generateImageWithGemini } = require('../ai/provider');
 const logger = require('../config/logger');
 
 // POST /api/ai/query — customer or admin AI query
@@ -174,6 +175,39 @@ router.get('/documents', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGE
       meta: { total, page: parseInt(page), limit: take, totalPages: Math.ceil(total / take) },
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/ai/generate-image — generate an image from a text prompt using Gemini
+router.post('/generate-image', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      throw new AppError('prompt is required', 400);
+    }
+
+    logger.info(`Generating image for prompt: "${prompt.trim().substring(0, 80)}..."`);
+
+    // Generate image via Gemini
+    const { data: base64Data, mimeType } = await generateImageWithGemini(prompt.trim());
+
+    // Convert base64 to Buffer and upload to Supabase Storage
+    const { uploadToStorage } = require('../config/storage');
+    const ext = mimeType === 'image/jpeg' ? '.jpg' : '.png';
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fakeFile = {
+      originalname: `ai-generated${ext}`,
+      buffer,
+      mimetype: mimeType,
+    };
+
+    const url = await uploadToStorage(fakeFile, 'ai-generated');
+    logger.info(`AI image uploaded to: ${url}`);
+
+    res.status(201).json({ success: true, data: { url, mimeType } });
+  } catch (error) {
+    logger.error(`Image generation failed: ${error.message}`);
     next(error);
   }
 });
