@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+// Store boot error so /api/boot-error can return it for live diagnosis
+let BOOT_ERROR = null;
+
 // Trim all env vars that may have \r\n from PowerShell piping during deployment
 ['DATABASE_URL', 'DIRECT_URL', 'CLIENT_URL', 'NODE_ENV', 'PORT',
   'JWT_SECRET', 'JWT_REFRESH_SECRET', 'JWT_EXPIRES_IN', 'JWT_REFRESH_EXPIRES_IN',
@@ -22,30 +25,51 @@ const missingVars = REQUIRED_ENV_VARS.filter(k => !process.env[k]);
 
 if (missingVars.length > 0) {
   console.error(`FATAL: Missing required environment variables: ${missingVars.join(', ')}`);
-  console.error('Set these in your Vercel project dashboard under Settings → Environment Variables.');
-  module.exports = (req, res) => {
-    res.status(500).json({
-      success: false,
-      error: { message: 'Server configuration error. Missing required environment variables.' },
-    });
-  };
-  return;
+  BOOT_ERROR = { message: `Missing required environment variables: ${missingVars.join(', ')}` };
 }
 
-let app;
-try {
-  app = require('../server/src/app');
-} catch (err) {
-  const errMsg = err.message || 'Unknown error';
-  const errStack = err.stack || '';
-  console.error('FATAL: Failed to load app module:', errMsg);
-  console.error(errStack);
-  app = (req, res) => {
-    res.status(500).json({
-      success: false,
-      error: { message: `App failed to initialize: ${errMsg}` },
-    });
-  };
+let app = null;
+if (!BOOT_ERROR) {
+  try {
+    app = require('../server/src/app');
+  } catch (err) {
+    BOOT_ERROR = { message: err.message, stack: err.stack };
+    console.error('FATAL: Failed to load app module:', err.message);
+    console.error(err.stack);
+  }
 }
 
-module.exports = app;
+module.exports = (req, res) => {
+  // Diagnostic endpoint — always available even on boot failure
+  if (req.url === '/api/boot-error' || req.url === '/api/boot-error/') {
+    return res.status(BOOT_ERROR ? 500 : 200).json({
+      ok: !BOOT_ERROR,
+      error: BOOT_ERROR,
+      env: {
+        NODE_ENV: process.env.NODE_ENV || 'not set',
+        hasDatabase: !!process.env.DATABASE_URL,
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        hasJwtRefresh: !!process.env.JWT_REFRESH_SECRET,
+        hasStripe: !!process.env.STRIPE_SECRET_KEY?.trim(),
+        hasGemini: !!process.env.GEMINI_API_KEY?.trim(),
+        hasOpenAI: !!process.env.OPENAI_API_KEY?.trim(),
+        hasDeepSeek: !!process.env.DEEPSEEK_API_KEY?.trim(),
+        hasSupabase: !!process.env.SUPABASE_URL?.trim(),
+      },
+    });
+  }
+
+  if (!app) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: BOOT_ERROR
+          ? `App failed to initialize: ${BOOT_ERROR.message}`
+          : 'App failed to initialize for unknown reason.',
+        hint: 'Visit /api/boot-error for diagnostics.',
+      },
+    });
+  }
+
+  return app(req, res);
+};
