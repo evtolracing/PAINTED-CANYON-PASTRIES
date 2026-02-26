@@ -126,8 +126,10 @@ app.get('/api/ai-status', (req, res) => {
     hasDeepSeekKey: !!process.env.DEEPSEEK_API_KEY?.trim(),
     hasOpenAIKey: !!process.env.OPENAI_API_KEY?.trim(),
     hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY?.trim(),
+    hasGeminiKey: !!process.env.GEMINI_API_KEY?.trim(),
     deepseekKeyPrefix: process.env.DEEPSEEK_API_KEY?.trim()?.substring(0, 6) || 'not set',
     openaiKeyPrefix: process.env.OPENAI_API_KEY?.trim()?.substring(0, 8) || 'not set',
+    geminiKeyPrefix: process.env.GEMINI_API_KEY?.trim()?.substring(0, 8) || 'not set',
   });
 });
 
