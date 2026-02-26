@@ -39,15 +39,27 @@ if (!BOOT_ERROR) {
   }
 }
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // Diagnostic endpoint — always available even on boot failure
   if (req.url === '/api/boot-error' || req.url === '/api/boot-error/') {
+    let dbStatus = 'not tested';
+    if (!BOOT_ERROR && app) {
+      try {
+        const prisma = require('../server/src/config/database');
+        await prisma.$queryRaw`SELECT 1`;
+        dbStatus = 'connected';
+      } catch (e) {
+        dbStatus = `FAILED: ${e.message}`;
+      }
+    }
     return res.status(BOOT_ERROR ? 500 : 200).json({
       ok: !BOOT_ERROR,
       error: BOOT_ERROR,
+      db: dbStatus,
       env: {
         NODE_ENV: process.env.NODE_ENV || 'not set',
         hasDatabase: !!process.env.DATABASE_URL,
+        hasDirectUrl: !!process.env.DIRECT_URL,
         hasJwtSecret: !!process.env.JWT_SECRET,
         hasJwtRefresh: !!process.env.JWT_REFRESH_SECRET,
         hasStripe: !!process.env.STRIPE_SECRET_KEY?.trim(),

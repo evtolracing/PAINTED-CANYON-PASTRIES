@@ -24,6 +24,18 @@ const errorHandler = (err, req, res, _next) => {
   if (err.code === 'P2025') {
     err.statusCode = 404;
     err.message = 'Record not found';
+    err.isOperational = true;
+  }
+  // Prisma connection / config errors — always expose so Vercel issues are diagnosable
+  if (err.code && /^P1/.test(err.code)) {
+    err.statusCode = 503;
+    err.message = `Database connection error (${err.code}): ${err.message}`;
+    err.isOperational = true;
+  }
+  // Prisma general query errors
+  if (err.code && /^P2/.test(err.code) && !err.isOperational) {
+    err.statusCode = 400;
+    err.isOperational = true;
   }
 
   // Joi validation errors
