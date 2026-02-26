@@ -190,7 +190,13 @@ router.post('/generate-image', authenticate, authorize('ADMIN', 'SUPER_ADMIN', '
     logger.info(`Generating image for prompt: "${prompt.trim().substring(0, 80)}..."`);
 
     // Generate image via Gemini
-    const { data: base64Data, mimeType } = await generateImageWithGemini(prompt.trim());
+    let imageResult;
+    try {
+      imageResult = await generateImageWithGemini(prompt.trim());
+    } catch (err) {
+      throw new AppError(`Image generation failed: ${err.message}`, 502);
+    }
+    const { data: base64Data, mimeType } = imageResult;
 
     // Convert base64 to Buffer and upload to Supabase Storage
     const { uploadToStorage } = require('../config/storage');
@@ -202,7 +208,12 @@ router.post('/generate-image', authenticate, authorize('ADMIN', 'SUPER_ADMIN', '
       mimetype: mimeType,
     };
 
-    const url = await uploadToStorage(fakeFile, 'ai-generated');
+    let url;
+    try {
+      url = await uploadToStorage(fakeFile, 'ai-generated');
+    } catch (err) {
+      throw new AppError(`Storage upload failed: ${err.message}`, 502);
+    }
     logger.info(`AI image uploaded to: ${url}`);
 
     res.status(201).json({ success: true, data: { url, mimeType } });
