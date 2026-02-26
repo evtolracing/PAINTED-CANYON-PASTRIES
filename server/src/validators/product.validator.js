@@ -53,4 +53,6 @@ const categorySchema = Joi.object({
   isActive: Joi.boolean().default(true),
 });
 
-module.exports = { productSchema, updateProductSchema, categorySchema };
+const updateCategorySchema = categorySchema.fork(['name'], (field) => field.optional());
+
+module.exports = { productSchema, updateProductSchema, categorySchema, updateCategorySchema };

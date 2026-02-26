@@ -64,7 +64,7 @@ const AdminCategories = () => {
       setDialogOpen(false);
       fetchCategories();
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'Failed to save category', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to save category', 'error');
     } finally {
       setSaving(false);
     }
@@ -78,17 +78,23 @@ const AdminCategories = () => {
       setDeleteDialog({ open: false, category: null });
       fetchCategories();
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'Failed to delete category', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to delete category', 'error');
     }
   };
 
   const toggleActive = async (cat) => {
     try {
-      await api.put(`/categories/${cat.id}`, { ...cat, isActive: !cat.isActive });
+      await api.put(`/categories/${cat.id}`, {
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description || '',
+        sortOrder: cat.sortOrder,
+        isActive: !cat.isActive,
+      });
       showSnackbar(`Category ${cat.isActive ? 'deactivated' : 'activated'}`, 'success');
       fetchCategories();
     } catch (err) {
-      showSnackbar('Failed to update category', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to update category', 'error');
     }
   };
 

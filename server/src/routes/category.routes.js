@@ -4,7 +4,7 @@ const prisma = require('../config/database');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { AppError } = require('../middleware/errorHandler');
-const { categorySchema } = require('../validators/product.validator');
+const { categorySchema, updateCategorySchema } = require('../validators/product.validator');
 
 // ─── PUBLIC ───────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), val
 });
 
 // PUT /api/categories/:id
-router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), validate(categorySchema), async (req, res, next) => {
+router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), validate(updateCategorySchema), async (req, res, next) => {
   try {
     const { id } = req.params;
     const existing = await prisma.category.findUnique({ where: { id } });

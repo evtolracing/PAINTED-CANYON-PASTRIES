@@ -23,6 +23,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Normalize server error shape: { error: { message } } → data.message
+    // This lets all pages safely read err.response?.data?.message
+    if (error.response?.data?.error?.message && !error.response.data.message) {
+      error.response.data.message = error.response.data.error.message;
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
