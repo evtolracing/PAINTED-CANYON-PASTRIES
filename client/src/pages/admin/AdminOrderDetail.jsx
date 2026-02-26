@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import {
   ArrowBack, Print, MoneyOff, CheckCircle, LocalShipping, AccessTime,
-  Warning, Person, ShoppingBag, Edit, Save
+  Warning, Person, ShoppingBag, Edit, Save, Cancel, DeleteForever
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
@@ -39,6 +39,9 @@ const AdminOrderDetail = () => {
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchOrder = async () => {
@@ -122,6 +125,35 @@ const AdminOrderDetail = () => {
       showSnackbar(err.response?.data?.message || 'Refund failed', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${id}/cancel`, { reason: cancelReason });
+      showSnackbar('Order cancelled', 'success');
+      setCancelDialogOpen(false);
+      setCancelReason('');
+      fetchOrder();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to cancel order', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setSaving(true);
+    try {
+      await api.delete(`/orders/${id}`);
+      showSnackbar('Order permanently deleted', 'success');
+      navigate('/admin/orders');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to delete order', 'error');
+    } finally {
+      setSaving(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -403,10 +435,25 @@ const AdminOrderDetail = () => {
               <Button
                 variant="outlined" color="error" startIcon={<MoneyOff />}
                 onClick={() => { setRefundAmount(order.totalAmount); setRefundDialogOpen(true); }}
-                disabled={order.status === 'REFUNDED'}
+                disabled={['REFUNDED', 'CANCELLED'].includes(order.status)}
               >
                 {order.status === 'REFUNDED' ? 'Already Refunded' : 'Issue Refund'}
               </Button>
+              <Button
+                variant="outlined" color="warning" startIcon={<Cancel />}
+                onClick={() => setCancelDialogOpen(true)}
+                disabled={['COMPLETED', 'CANCELLED', 'REFUNDED'].includes(order.status)}
+              >
+                {order.status === 'CANCELLED' ? 'Already Cancelled' : 'Cancel Order'}
+              </Button>
+              {['CANCELLED', 'REFUNDED'].includes(order.status) && (
+                <Button
+                  variant="outlined" color="error" startIcon={<DeleteForever />}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  Delete Order
+                </Button>
+              )}
             </Box>
           </Paper>
 
@@ -478,6 +525,45 @@ const AdminOrderDetail = () => {
           <Button onClick={() => setRefundDialogOpen(false)}>Cancel</Button>
           <Button variant="contained" color="error" onClick={handleRefund} disabled={saving}>
             Process Refund
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Cancel Order</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2, mt: 1 }}>
+            This will cancel order <strong>{order.orderNumber}</strong>.
+            {order.isPaid && ' A refund will be issued automatically if the order was paid via Stripe.'}
+          </Alert>
+          <TextField
+            fullWidth label="Reason for cancellation" multiline rows={2} value={cancelReason}
+            onChange={e => setCancelReason(e.target.value)}
+            placeholder="Optional — will be appended to production notes"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelDialogOpen(false)}>Keep Order</Button>
+          <Button variant="contained" color="warning" onClick={handleCancel} disabled={saving}>
+            Cancel Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Order Permanently</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mt: 1 }}>
+            This will <strong>permanently delete</strong> order <strong>{order.orderNumber}</strong> and all its items.
+            This action cannot be undone.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Keep Order</Button>
+          <Button variant="contained" color="error" onClick={handleDelete} disabled={saving}>
+            Delete Forever
           </Button>
         </DialogActions>
       </Dialog>

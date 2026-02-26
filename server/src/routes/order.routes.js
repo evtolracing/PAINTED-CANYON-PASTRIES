@@ -543,4 +543,77 @@ router.post('/:id/refund', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANA
   }
 });
 
+// PATCH /api/orders/:id/cancel — cancel an order
+router.patch('/:id/cancel', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) throw new AppError('Order not found', 404);
+
+    if (['COMPLETED', 'REFUNDED', 'CANCELLED'].includes(order.status)) {
+      throw new AppError(`Cannot cancel a ${order.status.toLowerCase()} order`, 400);
+    }
+
+    // If the order was paid via Stripe, issue a full refund automatically
+    let stripeRefundId = null;
+    if (order.stripePaymentId && order.isPaid) {
+      try {
+        const refund = await stripe.refunds.create({
+          payment_intent: order.stripePaymentId,
+          reason: 'requested_by_customer',
+        });
+        stripeRefundId = refund.id;
+      } catch (stripeErr) {
+        // Log but don't block cancellation
+        const logger = require('../config/logger');
+        logger.error(`Stripe refund failed during cancel: ${stripeErr.message}`);
+      }
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        ...(stripeRefundId && { stripeRefundId }),
+        ...(reason && { productionNotes: (order.productionNotes ? order.productionNotes + '\n' : '') + `[CANCELLED] ${reason}` }),
+      },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        items: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+
+    res.json({ success: true, data: updatedOrder });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/orders/:id — permanently delete an order (only CANCELLED/REFUNDED)
+router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) throw new AppError('Order not found', 404);
+
+    if (!['CANCELLED', 'REFUNDED'].includes(order.status)) {
+      throw new AppError('Only cancelled or refunded orders can be deleted. Cancel the order first.', 400);
+    }
+
+    // Delete related records in a transaction (cascade handles items/addons)
+    // But also clean up promo redemptions if any
+    await prisma.$transaction([
+      prisma.promoRedemption.deleteMany({ where: { orderId: id } }),
+      prisma.order.delete({ where: { id } }),
+    ]);
+
+    res.json({ success: true, message: 'Order permanently deleted' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
