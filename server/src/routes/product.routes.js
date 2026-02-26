@@ -186,10 +186,10 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), val
           },
         }),
         ...(variants?.length && {
-          variants: { create: variants },
+          variants: { create: variants.map(({ id: _id, isNew: _isNew, ...v }) => v) },
         }),
         ...(addons?.length && {
-          addons: { create: addons },
+          addons: { create: addons.map(({ id: _id, isNew: _isNew, ...a }) => a) },
         }),
       },
       include: {
@@ -237,7 +237,7 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
         await tx.productVariant.deleteMany({ where: { productId: id } });
         if (variants.length) {
           await tx.productVariant.createMany({
-            data: variants.map((v) => ({ ...v, productId: id })),
+            data: variants.map(({ id: _id, isNew: _isNew, ...v }) => ({ ...v, productId: id })),
           });
         }
       }
@@ -247,7 +247,7 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
         await tx.productAddon.deleteMany({ where: { productId: id } });
         if (addons.length) {
           await tx.productAddon.createMany({
-            data: addons.map((a) => ({ ...a, productId: id })),
+            data: addons.map(({ id: _id, isNew: _isNew, ...a }) => ({ ...a, productId: id })),
           });
         }
       }

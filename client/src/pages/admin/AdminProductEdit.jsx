@@ -223,7 +223,7 @@ const AdminProductEdit = () => {
         navigate('/admin/products');
       }
     } catch (err) {
-      showSnackbar(err.response?.data?.message || 'Failed to save product', 'error');
+      showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to save product', 'error');
     } finally {
       setSaving(false);
     }

@@ -44,9 +44,26 @@ app.use(requestId);
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// CORS
+// CORS — support comma-separated origins in CLIENT_URL and Vercel deploy URLs
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: (process.env.CLIENT_URL || 'http://localhost:3000').trim(),
+  origin: (origin, callback) => {
+    // Allow requests with no Origin header (same-origin, Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    // Allow if origin matches any allowed origin
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow any *.vercel.app origin (covers preview & production deploys)
+    if (/\.vercel\.app$/.test(origin)) return callback(null, true);
+    // In development, allow localhost on any port
+    if (process.env.NODE_ENV !== 'production' && /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],

@@ -16,7 +16,10 @@ const errorHandler = (err, req, res, _next) => {
   // Prisma errors
   if (err.code === 'P2002') {
     err.statusCode = 409;
-    err.message = `Duplicate entry: ${err.meta?.target?.join(', ')}`;
+    const fieldLabels = { sku: 'SKU', slug: 'slug', email: 'email' };
+    const label = err.meta?.target?.map(f => fieldLabels[f] || f).join(', ') || 'field';
+    err.message = `A record with this ${label} already exists. Please use a unique value.`;
+    err.isOperational = true;
   }
   if (err.code === 'P2025') {
     err.statusCode = 404;
