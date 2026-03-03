@@ -140,12 +140,16 @@ const AdminProductEdit = () => {
       if (!enhancedUrl) throw new Error('No URL returned');
 
       if (isNew) {
-        // Add AI-enhanced image as a pending URL entry
-        setProductImages(prev => [...prev, { id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: false, isAI: true, isBgEnhanced: true }]);
+        // Add AI-enhanced image as a pending URL entry — mark as primary so it shows on product cards
+        setProductImages(prev => [...prev, { id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: true, isAI: true, isBgEnhanced: true }]);
       } else {
-        // Attach to existing product via URL endpoint
-        const { data: imgData } = await api.post(`/products/${id}/images/url`, { url: enhancedUrl });
-        setProductImages(prev => [...prev, ...(imgData.data ? [{ ...imgData.data, isBgEnhanced: true }] : [{ id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: false, isBgEnhanced: true }])]);
+        // Attach to existing product via URL endpoint — set as primary so it shows on product cards
+        const { data: imgData } = await api.post(`/products/${id}/images/url`, { url: enhancedUrl, isPrimary: true });
+        setProductImages(prev => {
+          // Reset isPrimary on other images in state
+          const updated = prev.map(img => ({ ...img, isPrimary: false }));
+          return [...updated, ...(imgData.data ? [{ ...imgData.data, isBgEnhanced: true }] : [{ id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: true, isBgEnhanced: true }])];
+        });
       }
       showSnackbar('AI background generated!', 'success');
     } catch (err) {

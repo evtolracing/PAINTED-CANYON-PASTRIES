@@ -339,13 +339,19 @@ router.post('/:id/images/url', authenticate, authorize('ADMIN', 'SUPER_ADMIN', '
     if (!product) throw new AppError('Product not found', 404);
 
     const existingCount = await prisma.productImage.count({ where: { productId: id } });
+    const shouldBePrimary = isPrimary ?? existingCount === 0;
+
+    // If setting as primary, reset other images first
+    if (shouldBePrimary && existingCount > 0) {
+      await prisma.productImage.updateMany({ where: { productId: id }, data: { isPrimary: false } });
+    }
 
     const image = await prisma.productImage.create({
       data: {
         productId: id,
         url,
         alt: alt || product.name,
-        isPrimary: isPrimary ?? existingCount === 0,
+        isPrimary: shouldBePrimary,
         sortOrder: existingCount,
       },
     });
