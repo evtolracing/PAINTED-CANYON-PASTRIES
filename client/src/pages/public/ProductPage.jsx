@@ -12,6 +12,7 @@ import {
 import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const ProductPage = () => {
   const { slug } = useParams();
@@ -139,7 +140,7 @@ const ProductPage = () => {
               }}
             >
               {(product.images?.[0]?.url || product.imageUrl) ? (
-                <Box component="img" src={product.images?.[0]?.url || product.imageUrl} alt={product.name}
+                <Box component="img" src={getImageUrl(product.images?.[0]?.url || product.imageUrl)} alt={product.name}
                   sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <Typography variant="h1" sx={{ fontSize: '6rem', color: 'sandstone.300' }}>🎂</Typography>
@@ -301,7 +302,7 @@ const ProductPage = () => {
                       sx={{ height: 140, bgcolor: 'sandstone.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       {(p.images?.[0]?.url || p.imageUrl) ? (
-                        <Box component="img" src={p.images?.[0]?.url || p.imageUrl} alt={p.name}
+                        <Box component="img" src={getImageUrl(p.images?.[0]?.url || p.imageUrl)} alt={p.name}
                           sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <Typography sx={{ fontSize: '2.5rem', color: 'sandstone.300' }}>🥐</Typography>

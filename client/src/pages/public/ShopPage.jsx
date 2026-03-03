@@ -12,6 +12,7 @@ import {
 import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const CATEGORIES = [
   { key: 'all', label: 'All Products' },
@@ -238,7 +239,7 @@ const ShopPage = () => {
                           }}
                         >
                           {(product.images?.[0]?.url || product.imageUrl) ? (
-                            <Box component="img" src={product.images?.[0]?.url || product.imageUrl} alt={product.name}
+                            <Box component="img" src={getImageUrl(product.images?.[0]?.url || product.imageUrl)} alt={product.name}
                               sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🥐</Typography>

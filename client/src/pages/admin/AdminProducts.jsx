@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const AdminProducts = () => {
   const navigate = useNavigate();
@@ -189,7 +190,7 @@ const AdminProducts = () => {
                   sx={{ height: 140, bgcolor: 'sandstone.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   {product.images?.[0]?.url
-                    ? <img src={product.images[0].url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <img src={getImageUrl(product.images[0].url)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <Inventory2 sx={{ fontSize: 40, color: 'text.secondary' }} />
                   }
                 </CardMedia>

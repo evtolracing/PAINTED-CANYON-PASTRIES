@@ -10,6 +10,7 @@ import {
 import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
 import api from '../../services/api';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const CartPage = () => {
   const { items, updateQuantity, removeItem, subtotal } = useCart();
@@ -88,7 +89,7 @@ const CartPage = () => {
                     }}
                   >
                     {(item.product.images?.[0]?.url || item.product.imageUrl) ? (
-                      <Box component="img" src={item.product.images?.[0]?.url || item.product.imageUrl} alt={item.product.name}
+                      <Box component="img" src={getImageUrl(item.product.images?.[0]?.url || item.product.imageUrl)} alt={item.product.name}
                         sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <Typography sx={{ fontSize: '2rem' }}>🥐</Typography>
