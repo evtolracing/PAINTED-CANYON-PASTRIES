@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Box, Container, Typography, Grid, Button, Paper, Stack, Stepper, Step,
@@ -408,8 +408,8 @@ const CheckoutForm = ({ stripeReady }) => {
             </Stack>
           )}
 
-          {/* Step 3: Payment */}
-          {activeStep === 2 && (
+          {/* Step 3: Payment — entire section kept in DOM (display:none) so CardElement never unmounts */}
+          <Box sx={{ display: activeStep === 2 ? 'block' : 'none' }}>
             <Stack spacing={3}>
               <Typography variant="h5">Payment</Typography>
 
@@ -496,7 +496,7 @@ const CheckoutForm = ({ stripeReady }) => {
                 </Alert>
               )}
             </Stack>
-          )}
+          </Box>
 
           {/* Step 4: Review */}
           {activeStep === 3 && (
