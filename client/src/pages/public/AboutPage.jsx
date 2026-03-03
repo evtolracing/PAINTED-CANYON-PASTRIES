@@ -38,7 +38,7 @@ const AboutPage = () => {
       {/* Hero */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #faf7f2 0%, #ebe0cc 100%)',
+          background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[50]} 0%, ${theme.palette.sandstone[200]} 100%)`,
           py: { xs: 8, md: 14 },
           textAlign: 'center',
           position: 'relative',
@@ -169,7 +169,7 @@ const AboutPage = () => {
       )}
 
       {/* CTA */}
-      <Box sx={{ bgcolor: 'secondary.main', color: '#fff', py: { xs: 6, md: 8 }, textAlign: 'center' }}>
+      <Box sx={{ bgcolor: (theme) => theme.palette.mode === 'dark' ? '#2a1f1a' : 'secondary.main', color: '#fff', py: { xs: 6, md: 8 }, textAlign: 'center' }}>
         <Container maxWidth="sm">
           <Typography variant="h3" sx={{ color: '#fff', mb: 2 }}>
             Ready to Taste the Canyon?

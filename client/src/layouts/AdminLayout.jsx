@@ -9,9 +9,10 @@ import {
   Dashboard, ShoppingBag, Inventory2, Category, CalendarMonth,
   People, LocalOffer, MenuBook, BarChart, Settings, SmartToy,
   Menu as MenuIcon, Logout, ChevronLeft, StorefrontOutlined,
-  PointOfSale, Restaurant, LocalShipping, Web
+  PointOfSale, Restaurant, LocalShipping, Web, LightMode, DarkMode
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 import api from '../services/api';
 import { getImageUrl } from '../utils/imageUrl';
 
@@ -43,6 +44,7 @@ const AdminLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const { user, logout } = useAuth();
+  const { mode, toggleMode } = useThemeMode();
   const location = useLocation();
   const navigate = useNavigate();
   const [bakeryLogo, setBakeryLogo] = useState(null);
@@ -183,6 +185,9 @@ const AdminLayout = () => {
               </IconButton>
             )}
             <Box sx={{ flex: 1 }} />
+            <IconButton onClick={toggleMode} size="small" sx={{ mr: 1, color: 'text.secondary' }} aria-label="Toggle dark mode">
+              {mode === 'dark' ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}
+            </IconButton>
             <Box
               sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}
               onClick={(e) => setAnchorEl(e.currentTarget)}

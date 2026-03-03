@@ -7,11 +7,12 @@ import {
 } from '@mui/material';
 import {
   ShoppingCart, Menu as MenuIcon, Close, Person, StorefrontOutlined,
-  Logout, History, AccessTime
+  Logout, History, AccessTime, LightMode, DarkMode
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import AIAssistantWidget from '../components/AIAssistantWidget';
+import { useThemeMode } from '../context/ThemeContext';
 import api from '../services/api';
 import { getImageUrl } from '../utils/imageUrl';
 
@@ -26,6 +27,7 @@ const navLinks = [
 const PublicLayout = () => {
   const { user, isAdmin, logout } = useAuth();
   const { itemCount } = useCart();
+  const { mode, toggleMode } = useThemeMode();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
@@ -130,6 +132,9 @@ const PublicLayout = () => {
 
             {/* Right Actions */}
             <Stack direction="row" spacing={1} alignItems="center">
+              <IconButton onClick={toggleMode} size="small" sx={{ color: 'text.secondary' }} aria-label="Toggle dark mode">
+                {mode === 'dark' ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}
+              </IconButton>
               {isAdmin && (
                 <Button
                   component={Link}
@@ -265,7 +270,7 @@ const PublicLayout = () => {
       <Box
         component="footer"
         sx={{
-          bgcolor: 'secondary.main',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? '#2a1f1a' : 'secondary.main',
           color: 'white',
           mt: 'auto',
           py: { xs: 4, md: 6 },

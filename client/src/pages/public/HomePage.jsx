@@ -108,7 +108,7 @@ const HomePage = () => {
           minHeight: { xs: 'auto', md: '85vh' },
           display: 'flex',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, #faf7f2 0%, #f5efe5 50%, #ebe0cc 100%)',
+          background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[50]} 0%, ${theme.palette.sandstone[100]} 50%, ${theme.palette.sandstone[200]} 100%)`,
           overflow: 'hidden',
           py: { xs: 4, md: 0 },
         }}
@@ -566,7 +566,7 @@ const HomePage = () => {
                 sx={{
                   height: 400,
                   borderRadius: 4,
-                  background: 'linear-gradient(135deg, #ebe0cc 0%, #dccaaa 100%)',
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[200]} 0%, ${theme.palette.sandstone[300]} 100%)`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -595,7 +595,7 @@ const HomePage = () => {
       </Container>
 
       {/* Testimonials */}
-      <Box sx={{ bgcolor: 'secondary.main', color: 'white', py: { xs: 5, md: 10 } }}>
+      <Box sx={{ bgcolor: (theme) => theme.palette.mode === 'dark' ? '#2a1f1a' : 'secondary.main', color: 'white', py: { xs: 5, md: 10 } }}>
         <Container maxWidth="lg">
           <Typography variant="h2" align="center" sx={{ color: 'white', mb: { xs: 3, md: 6 } }}>
             What Locals Say
@@ -613,7 +613,7 @@ const HomePage = () => {
                     height: '100%',
                   }}
                 >
-                  <Rating value={5} readOnly size="small" sx={{ mb: 2, '& .MuiRating-icon': { color: '#c4956a' } }} />
+                  <Rating value={5} readOnly size="small" sx={{ mb: 2, '& .MuiRating-icon': { color: 'primary.main' } }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', mb: 2, fontStyle: 'italic' }}>
                     "{t.text}"
                   </Typography>
@@ -669,7 +669,7 @@ const HomePage = () => {
                         sx={{
                           width: '100%',
                           height: '100%',
-                          background: 'linear-gradient(135deg, #ebe0cc 0%, #dccaaa 100%)',
+                          background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[200]} 0%, ${theme.palette.sandstone[300]} 100%)`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -705,7 +705,7 @@ const HomePage = () => {
                   sx={{
                     aspectRatio: '1',
                     borderRadius: 3,
-                    background: `linear-gradient(${135 + i * 30}deg, ${['#ebe0cc', '#dccaaa', '#c4956a', '#d4a87e', '#f5efe5', '#a67c52'][i]} 0%, ${['#dccaaa', '#c4956a', '#a67c52', '#c4956a', '#ebe0cc', '#8b6544'][i]} 100%)`,
+                    background: (theme) => `linear-gradient(${135 + i * 30}deg, ${theme.palette.sandstone[200]} 0%, ${theme.palette.sandstone[400]} 100%)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -726,7 +726,7 @@ const HomePage = () => {
       {/* Newsletter */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #f5efe5 0%, #ebe0cc 100%)',
+          background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[100]} 0%, ${theme.palette.sandstone[200]} 100%)`,
           py: { xs: 5, md: 8 },
         }}
       >

@@ -1,8 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import theme from './theme/theme';
+import { ThemeContextProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { SnackbarProvider } from './context/SnackbarContext';
@@ -60,8 +58,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <ThemeContextProvider>
       <ErrorBoundary>
       <SnackbarProvider>
         <AuthProvider>
@@ -125,7 +122,7 @@ function App() {
         </AuthProvider>
       </SnackbarProvider>
       </ErrorBoundary>
-    </ThemeProvider>
+    </ThemeContextProvider>
   );
 }
 

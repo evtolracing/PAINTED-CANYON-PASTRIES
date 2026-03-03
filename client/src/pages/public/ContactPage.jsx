@@ -71,7 +71,7 @@ const ContactPage = () => {
       {/* Header */}
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #faf7f2 0%, #ebe0cc 100%)',
+          background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[50]} 0%, ${theme.palette.sandstone[200]} 100%)`,
           py: { xs: 6, md: 10 },
           textAlign: 'center',
         }}
