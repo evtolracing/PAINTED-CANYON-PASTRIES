@@ -122,14 +122,13 @@ router.get('/homepage', async (req, res, next) => {
       variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
     };
 
-    // Fetch best sellers, seasonal, and products with images
+    // Fetch best sellers (all products with "Best Seller" badge), seasonal, and products with images
     const [bestSellers, seasonal, withImages] = await Promise.all([
-      bestSellerIds.length > 0
-        ? prisma.product.findMany({
-            where: { id: { in: bestSellerIds }, isActive: true },
-            include: productInclude,
-          })
-        : [],
+      prisma.product.findMany({
+        where: { isActive: true, badges: { has: 'Best Seller' } },
+        include: productInclude,
+        orderBy: { sortOrder: 'asc' },
+      }),
       seasonalIds.length > 0
         ? prisma.product.findMany({
             where: { id: { in: seasonalIds }, isActive: true },
@@ -147,10 +146,8 @@ router.get('/homepage', async (req, res, next) => {
       }),
     ]);
 
-    // Preserve the admin-chosen order for best sellers
-    const orderedBestSellers = bestSellerIds
-      .map(id => bestSellers.find(p => p.id === id))
-      .filter(Boolean);
+    // Best sellers are already ordered by sortOrder from query
+    const orderedBestSellers = bestSellers;
 
     const orderedSeasonal = seasonalIds
       .map(id => seasonal.find(p => p.id === id))

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box, Container, Typography, Button, Grid, Card, CardMedia, CardContent,
@@ -12,6 +12,161 @@ import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
 import { getImageUrl } from '../../utils/imageUrl';
+
+/* ── Best Sellers horizontal auto-scroll strip ── */
+const CARD_WIDTH = 260;  // px per card
+const CARD_GAP = 16;     // px gap
+
+const BestSellersStrip = ({ products, loading, addItem, showSnackbar }) => {
+  const scrollRef = useRef(null);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Slow auto-scroll
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || loading || products.length <= 0) return;
+
+    // Only auto-scroll if content overflows
+    const needsScroll = el.scrollWidth > el.clientWidth;
+    if (!needsScroll) return;
+
+    let raf;
+    const speed = 0.5; // px per frame (~30px/s at 60fps)
+
+    const step = () => {
+      if (!isPaused && el) {
+        el.scrollLeft += speed;
+        // Loop back to start when reaching the end
+        if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 1) {
+          el.scrollLeft = 0;
+        }
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [loading, products, isPaused]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', gap: 2, px: { xs: 2, md: 4 }, overflow: 'hidden' }}>
+        {Array(5).fill(null).map((_, i) => (
+          <Card key={i} sx={{ minWidth: CARD_WIDTH, flex: '0 0 auto' }}>
+            <Skeleton variant="rectangular" height={200} />
+            <CardContent>
+              <Skeleton width="60%" />
+              <Skeleton width="80%" />
+              <Skeleton width="30%" />
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+    );
+  }
+
+  if (products.length === 0) return null;
+
+  return (
+    <Box
+      ref={scrollRef}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={() => setIsPaused(true)}
+      onTouchEnd={() => setIsPaused(false)}
+      sx={{
+        display: 'flex',
+        gap: `${CARD_GAP}px`,
+        px: { xs: 2, md: 4 },
+        overflowX: 'auto',
+        scrollBehavior: 'smooth',
+        // Hide scrollbar but keep scrollable
+        '&::-webkit-scrollbar': { display: 'none' },
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
+    >
+      {products.map((product) => (
+        <Card
+          key={product.id}
+          component={Link}
+          to={`/product/${product.slug}`}
+          sx={{
+            minWidth: { xs: 200, sm: CARD_WIDTH },
+            maxWidth: { xs: 200, sm: CARD_WIDTH },
+            flex: '0 0 auto',
+            display: 'flex',
+            flexDirection: 'column',
+            cursor: 'pointer',
+            textDecoration: 'none',
+          }}
+        >
+          <Box sx={{ position: 'relative' }}>
+            <CardMedia
+              sx={{
+                height: { xs: 150, sm: 200 },
+                bgcolor: 'sandstone.100',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '3rem',
+              }}
+            >
+              {product.images?.[0]?.url ? (
+                <Box
+                  component="img"
+                  src={getImageUrl(product.images[0].url)}
+                  alt={product.name}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🧁</Typography>
+              )}
+            </CardMedia>
+            {product.badges?.length > 0 && (
+              <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 8, left: 8 }}>
+                {product.badges.map((badge) => (
+                  <Chip
+                    key={badge}
+                    label={badge}
+                    size="small"
+                    color={badge === 'Best Seller' ? 'primary' : 'default'}
+                    sx={{ fontWeight: 600, fontSize: '0.6rem' }}
+                  />
+                ))}
+              </Stack>
+            )}
+          </Box>
+          <CardContent sx={{ flexGrow: 1, px: 1.5, py: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              {product.category?.name}
+            </Typography>
+            <Typography variant="h6" sx={{ fontSize: '0.9rem', mb: 0.25 }} noWrap>
+              {product.name}
+            </Typography>
+            <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+              ${Number(product.basePrice).toFixed(2)}
+            </Typography>
+          </CardContent>
+          <CardActions sx={{ px: 1.5, pb: 1.5 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              fullWidth
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addItem(product);
+                showSnackbar(`${product.name} added to cart!`);
+              }}
+            >
+              Add to Cart
+            </Button>
+          </CardActions>
+        </Card>
+      ))}
+    </Box>
+  );
+};
 
 const HomePage = () => {
   const [bestSellers, setBestSellers] = useState([]);
@@ -364,7 +519,7 @@ const HomePage = () => {
       </Container>
 
       {/* Best Sellers */}
-      <Box sx={{ bgcolor: 'background.paper', py: { xs: 5, md: 10 } }}>
+      <Box sx={{ bgcolor: 'background.paper', py: { xs: 5, md: 10 }, overflow: 'hidden' }}>
         <Container maxWidth="lg">
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, flexWrap: 'wrap', gap: 1 }}>
             <Box>
@@ -375,98 +530,15 @@ const HomePage = () => {
               View All
             </Button>
           </Box>
-
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            {(loading ? Array(4).fill(null) : bestSellers.slice(0, 4)).map((product, i) => (
-              <Grid item xs={6} sm={6} md={3} key={product?.id || i}>
-                {loading ? (
-                  <Card>
-                    <Skeleton variant="rectangular" height={220} />
-                    <CardContent>
-                      <Skeleton width="60%" />
-                      <Skeleton width="80%" />
-                      <Skeleton width="30%" />
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                    }}
-                    component={Link}
-                    to={`/product/${product.slug}`}
-                  >
-                    <Box sx={{ position: 'relative' }}>
-                      <CardMedia
-                        sx={{
-                          height: { xs: 150, sm: 180, md: 220 },
-                          bgcolor: 'sandstone.100',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '3rem',
-                        }}
-                      >
-                        {(product.images?.[0]?.url) ? (
-                          <Box component="img" src={getImageUrl(product.images[0].url)} alt={product.name}
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🧁</Typography>
-                        )}
-                      </CardMedia>
-                      {product.badges?.length > 0 && (
-                        <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 12, left: 12 }}>
-                          {product.badges.map((badge) => (
-                            <Chip
-                              key={badge}
-                              label={badge}
-                              size="small"
-                              color={badge === 'Best Seller' ? 'primary' : 'default'}
-                              sx={{ fontWeight: 600, fontSize: '0.65rem' }}
-                            />
-                          ))}
-                        </Stack>
-                      )}
-                    </Box>
-                    <CardContent sx={{ flexGrow: 1, px: { xs: 1.5, md: 2 }, py: { xs: 1, md: 2 } }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem', display: { xs: 'none', sm: 'block' } }}>
-                        {product.category?.name}
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', md: '1rem' }, mb: 0.5 }}>
-                        {product.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: { xs: 'none', sm: 'block' } }}>
-                        {product.shortDescription}
-                      </Typography>
-                      <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, fontSize: { xs: '0.9rem', md: '1rem' } }}>
-                        ${Number(product.basePrice).toFixed(2)}
-                      </Typography>
-                    </CardContent>
-                    <CardActions sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        fullWidth
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          addItem(product);
-                          showSnackbar(`${product.name} added to cart!`);
-                        }}
-                      >
-                        Add to Cart
-                      </Button>
-                    </CardActions>
-                  </Card>
-                )}
-              </Grid>
-            ))}
-          </Grid>
         </Container>
+
+        {/* Scrolling strip */}
+        <BestSellersStrip
+          products={bestSellers}
+          loading={loading}
+          addItem={addItem}
+          showSnackbar={showSnackbar}
+        />
       </Box>
 
       {/* Seasonal Collection */}
