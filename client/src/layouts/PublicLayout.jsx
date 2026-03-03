@@ -188,15 +188,17 @@ const PublicLayout = () => {
                   <ShoppingCart />
                 </Badge>
               </IconButton>
-              <Button
-                component={Link}
-                to="/shop"
-                variant="contained"
-                size="small"
-                sx={{ display: { xs: 'none', sm: 'flex' } }}
-              >
-                Order Now
-              </Button>
+              {!user && (
+                <Button
+                  component={Link}
+                  to="/shop"
+                  variant="contained"
+                  size="small"
+                  sx={{ display: { xs: 'none', sm: 'flex' } }}
+                >
+                  Order Now
+                </Button>
+              )}
             </Stack>
           </Toolbar>
         </Container>
