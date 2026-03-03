@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box, Container, Typography, Button, Grid, Card, CardMedia, CardContent,
@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   ArrowForward, LocalShipping, StorefrontOutlined, Schedule, Star,
-  Email as EmailIcon
+  Email as EmailIcon, ChevronLeft, ChevronRight
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useCart } from '../../context/CartContext';
@@ -22,13 +22,47 @@ const HomePage = () => {
   const { addItem } = useCart();
   const { showSnackbar } = useSnackbar();
 
+  // Hero slideshow
+  const [slideImages, setSlideImages] = useState([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
   useEffect(() => {
     const fetchHomepage = async () => {
       try {
         const { data } = await api.get('/settings/homepage');
-        setBestSellers(data.data?.bestSellers || []);
-        setSeasonal(data.data?.seasonal || []);
-        setFromBakery(data.data?.fromOurBakery || []);
+        const bs = data.data?.bestSellers || [];
+        const sn = data.data?.seasonal || [];
+        const fb = data.data?.fromOurBakery || [];
+        setBestSellers(bs);
+        setSeasonal(sn);
+        setFromBakery(fb);
+
+        // Build slideshow: featured/bestSellers first, then seasonal, then rest
+        // Deduplicate by id and only include products with images
+        const seen = new Set();
+        const slides = [];
+        for (const p of [...bs, ...sn, ...fb]) {
+          const imgUrl = p.images?.[0]?.url || p.imageUrl;
+          if (imgUrl && !seen.has(p.id)) {
+            seen.add(p.id);
+            slides.push({ id: p.id, name: p.name, slug: p.slug, image: imgUrl });
+          }
+        }
+        // If curated list is small, fetch more products
+        if (slides.length < 4) {
+          try {
+            const { data: allData } = await api.get('/products', { params: { limit: 20 } });
+            const prods = allData.data || allData || [];
+            for (const p of prods) {
+              const imgUrl = p.images?.[0]?.url || p.imageUrl;
+              if (imgUrl && !seen.has(p.id)) {
+                seen.add(p.id);
+                slides.push({ id: p.id, name: p.name, slug: p.slug, image: imgUrl });
+              }
+            }
+          } catch { /* ok */ }
+        }
+        setSlideImages(slides);
       } catch {
         setBestSellers([]);
         setSeasonal([]);
@@ -39,6 +73,19 @@ const HomePage = () => {
     };
     fetchHomepage();
   }, []);
+
+  // Auto-advance hero slideshow
+  useEffect(() => {
+    if (slideImages.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slideImages.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [slideImages.length]);
+
+  const goToSlide = useCallback((dir) => {
+    setCurrentSlide((prev) => (prev + dir + slideImages.length) % slideImages.length);
+  }, [slideImages.length]);
 
   const handleNewsletter = async (e) => {
     e.preventDefault();
@@ -136,35 +183,143 @@ const HomePage = () => {
                   width: '100%',
                   height: 500,
                   borderRadius: 4,
-                  background: 'linear-gradient(160deg, #d4a87e 0%, #c4956a 30%, #a67c52 70%, #8b6544 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 20px 60px rgba(139,101,68,0.3)',
                   position: 'relative',
                   overflow: 'hidden',
+                  boxShadow: '0 20px 60px rgba(139,101,68,0.3)',
+                  background: 'linear-gradient(160deg, #d4a87e 0%, #c4956a 30%, #a67c52 70%, #8b6544 100%)',
                 }}
               >
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    opacity: 0.15,
-                    background: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
-                  }}
-                />
-                <Typography
-                  sx={{
-                    fontFamily: '"Playfair Display", serif',
-                    fontSize: '2.5rem',
-                    color: 'white',
-                    textAlign: 'center',
-                    fontWeight: 600,
-                    textShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  🧁<br />Fresh Daily
-                </Typography>
+                {slideImages.length > 0 ? (
+                  <>
+                    {/* Slides */}
+                    {slideImages.map((slide, i) => (
+                      <Box
+                        key={slide.id}
+                        component={Link}
+                        to={`/product/${slide.slug}`}
+                        sx={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: i === currentSlide ? 1 : 0,
+                          transition: 'opacity 0.8s ease-in-out',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={getImageUrl(slide.image)}
+                          alt={slide.name}
+                          sx={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                        {/* Product name overlay */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            p: 3,
+                            background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+                          }}
+                        >
+                          <Typography
+                            variant="h5"
+                            sx={{
+                              color: 'white',
+                              fontFamily: '"Playfair Display", serif',
+                              fontWeight: 600,
+                              textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                            }}
+                          >
+                            {slide.name}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+
+                    {/* Arrow buttons */}
+                    {slideImages.length > 1 && (
+                      <>
+                        <IconButton
+                          onClick={() => goToSlide(-1)}
+                          sx={{
+                            position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                            bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                            zIndex: 2,
+                          }}
+                          size="small"
+                        >
+                          <ChevronLeft />
+                        </IconButton>
+                        <IconButton
+                          onClick={() => goToSlide(1)}
+                          sx={{
+                            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                            bgcolor: 'rgba(255,255,255,0.7)', '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                            zIndex: 2,
+                          }}
+                          size="small"
+                        >
+                          <ChevronRight />
+                        </IconButton>
+                      </>
+                    )}
+
+                    {/* Dot indicators */}
+                    {slideImages.length > 1 && (
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        sx={{ position: 'absolute', bottom: 60, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}
+                      >
+                        {slideImages.map((_, i) => (
+                          <Box
+                            key={i}
+                            onClick={() => setCurrentSlide(i)}
+                            sx={{
+                              width: i === currentSlide ? 24 : 8,
+                              height: 8,
+                              borderRadius: 4,
+                              bgcolor: i === currentSlide ? 'white' : 'rgba(255,255,255,0.5)',
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                            }}
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                  </>
+                ) : (
+                  /* Fallback if no product images available */
+                  <>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 0.15,
+                        background: 'repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.1) 20px, rgba(255,255,255,0.1) 40px)',
+                      }}
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <Typography
+                        sx={{
+                          fontFamily: '"Playfair Display", serif',
+                          fontSize: '2.5rem',
+                          color: 'white',
+                          textAlign: 'center',
+                          fontWeight: 600,
+                          textShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        }}
+                      >
+                        🧁<br />Fresh Daily
+                      </Typography>
+                    </Box>
+                  </>
+                )}
               </Box>
             </Grid>
           </Grid>
