@@ -150,7 +150,7 @@ const AIAssistantWidget = ({ context = 'customer' }) => {
                     p: 1.5,
                     maxWidth: '85%',
                     borderRadius: 2,
-                    bgcolor: msg.role === 'user' ? 'primary.main' : 'grey.50',
+                    bgcolor: msg.role === 'user' ? 'primary.main' : 'action.hover',
                     color: msg.role === 'user' ? 'white' : 'text.primary',
                   }}
                 >
@@ -175,7 +175,7 @@ const AIAssistantWidget = ({ context = 'customer' }) => {
             ))}
             {loading && (
               <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 1.5 }}>
-                <Paper elevation={0} sx={{ p: 1.5, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Paper elevation={0} sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 2 }}>
                   <CircularProgress size={16} color="primary" />
                 </Paper>
               </Box>
@@ -218,7 +218,7 @@ const AIAssistantWidget = ({ context = 'customer' }) => {
                   bgcolor: 'primary.main',
                   color: 'white',
                   '&:hover': { bgcolor: 'primary.dark' },
-                  '&.Mui-disabled': { bgcolor: 'grey.200' },
+                  '&.Mui-disabled': { bgcolor: 'action.disabledBackground' },
                 }}
               >
                 <Send fontSize="small" />
