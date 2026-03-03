@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
   ShoppingCart, Menu as MenuIcon, Close, Person, StorefrontOutlined,
-  Logout, History
+  Logout, History, AccessTime
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -30,10 +30,22 @@ const PublicLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const [bakeryLogo, setBakeryLogo] = useState(null);
+  const [storeHours, setStoreHours] = useState([]);
+
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const formatTime = (t) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return m === 0 ? `${hour12} ${suffix}` : `${hour12}:${String(m).padStart(2, '0')} ${suffix}`;
+  };
 
   useEffect(() => {
     api.get('/settings/public').then(({ data }) => {
       if (data.data?.bakeryLogo) setBakeryLogo(data.data.bakeryLogo);
+      if (data.data?.storeHours) setStoreHours(data.data.storeHours);
     }).catch(() => {});
   }, []);
 
@@ -258,7 +270,7 @@ const PublicLayout = () => {
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 1fr 1fr 1fr' }, gap: 4 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 1fr 1fr 1fr 1fr' }, gap: 4 }}>
             <Box>
               <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', mb: 1 }}>
                 Painted Canyon Pastries
@@ -318,6 +330,28 @@ const PublicLayout = () => {
                   {link.label}
                 </Typography>
               ))}
+            </Box>
+            <Box>
+              <Typography variant="overline" sx={{ color: 'primary.light', display: 'block', mb: 1 }}>
+                <AccessTime sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />
+                Hours
+              </Typography>
+              {storeHours.length > 0 ? (
+                storeHours.map((h) => (
+                  <Box key={h.dayOfWeek} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, minWidth: 36 }}>
+                      {DAY_NAMES[h.dayOfWeek]}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: h.isClosed ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.7)' }}>
+                      {h.isClosed ? 'Closed' : `${formatTime(h.openTime)} – ${formatTime(h.closeTime)}`}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  See Contact page for hours
+                </Typography>
+              )}
             </Box>
           </Box>
           <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)', my: 4 }} />

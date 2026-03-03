@@ -169,7 +169,7 @@ router.delete('/avatar', authenticate, async (req, res, next) => {
 router.get('/users', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, avatar: true, createdAt: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, avatar: true, pin: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ success: true, data: users });
@@ -215,6 +215,68 @@ router.post('/invite', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (r
     });
 
     res.status(201).json({ success: true, data: user, tempPassword });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/auth/users/:id — update a user (admin only)
+router.put('/users/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { pin, role, isActive, firstName, lastName } = req.body;
+
+    const updateData = {};
+    if (pin !== undefined) updateData.pin = pin || null;
+    if (role !== undefined) {
+      const validRoles = ['BAKER', 'CASHIER', 'MANAGER', 'ADMIN'];
+      if (validRoles.includes(role)) updateData.role = role;
+    }
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid fields to update' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isActive: true, pin: true, createdAt: true },
+    });
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/auth/users/:id — delete a user (admin only)
+router.delete('/users/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent self-deletion
+    if (id === req.user.id) {
+      return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Prevent deleting SUPER_ADMIN
+    if (user.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, message: 'Cannot delete a Super Admin account' });
+    }
+
+    // Delete sessions first, then user
+    await prisma.session.deleteMany({ where: { userId: id } });
+    await prisma.user.delete({ where: { id } });
+
+    res.json({ success: true, message: 'User deleted' });
   } catch (error) {
     next(error);
   }

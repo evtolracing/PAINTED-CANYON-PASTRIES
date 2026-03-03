@@ -9,7 +9,7 @@ import {
   Dashboard, ShoppingBag, Inventory2, Category, CalendarMonth,
   People, LocalOffer, MenuBook, BarChart, Settings, SmartToy,
   Menu as MenuIcon, Logout, ChevronLeft, StorefrontOutlined,
-  PointOfSale, Restaurant, LocalShipping
+  PointOfSale, Restaurant, LocalShipping, Web
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -19,6 +19,7 @@ const DRAWER_WIDTH = 260;
 
 const menuItems = [
   { label: 'Dashboard', icon: <Dashboard />, path: '/admin' },
+  { label: 'Homepage', icon: <Web />, path: '/admin/homepage' },
   { label: 'Orders', icon: <ShoppingBag />, path: '/admin/orders' },
   { label: 'Products', icon: <Inventory2 />, path: '/admin/products' },
   { label: 'Categories', icon: <Category />, path: '/admin/categories' },

@@ -8,11 +8,12 @@ import {
 } from '@mui/material';
 import {
   Save, Refresh, Settings, LocalShipping, Receipt, Email,
-  People, Add, Delete, Edit, CloudUpload
+  People, Add, Delete, Edit, CloudUpload, Pin, Visibility, VisibilityOff
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
 import { getImageUrl } from '../../utils/imageUrl';
+import AdminEmailTemplates from './AdminEmailTemplates';
 
 const AdminSettings = () => {
   const { showSnackbar } = useSnackbar();
@@ -44,7 +45,12 @@ const AdminSettings = () => {
   // Users
   const [users, setUsers] = useState([]);
   const [inviteDialog, setInviteDialog] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '', role: 'BAKER' });
+  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '', role: 'BAKER', pin: '' });
+  const [pinDialog, setPinDialog] = useState({ open: false, user: null });
+  const [editPin, setEditPin] = useState('');
+  const [showPin, setShowPin] = useState({});
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, user: null });
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -150,10 +156,38 @@ const AdminSettings = () => {
       await api.post('/auth/invite', inviteForm);
       showSnackbar('User invited', 'success');
       setInviteDialog(false);
-      setInviteForm({ email: '', firstName: '', lastName: '', role: 'BAKER' });
+      setInviteForm({ email: '', firstName: '', lastName: '', role: 'BAKER', pin: '' });
       fetchUsers();
     } catch (err) {
       showSnackbar(err.response?.data?.message || 'Failed to invite user', 'error');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteDialog.user) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/auth/users/${deleteDialog.user.id}`);
+      showSnackbar(`${deleteDialog.user.firstName} ${deleteDialog.user.lastName} has been deleted`, 'success');
+      setDeleteDialog({ open: false, user: null });
+      fetchUsers();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to delete user', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSavePin = async () => {
+    if (!pinDialog.user) return;
+    try {
+      await api.put(`/auth/users/${pinDialog.user.id}`, { pin: editPin || null });
+      showSnackbar(editPin ? `PIN updated for ${pinDialog.user.firstName}` : `PIN removed for ${pinDialog.user.firstName}`, 'success');
+      setPinDialog({ open: false, user: null });
+      setEditPin('');
+      fetchUsers();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Failed to update PIN', 'error');
     }
   };
 
@@ -288,27 +322,7 @@ const AdminSettings = () => {
           )}
 
           {/* Email Templates */}
-          {tab === 3 && (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>Email Templates</Typography>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                Email templates are configured for automated notifications. Modify with care.
-              </Alert>
-              {['Order Confirmation', 'Status Update', 'Delivery Notification', 'Welcome Email'].map((template) => (
-                <Paper key={template} variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{template}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Sent automatically when triggered
-                    </Typography>
-                  </Box>
-                  <Button size="small" variant="outlined" startIcon={<Edit />}>
-                    View / Edit
-                  </Button>
-                </Paper>
-              ))}
-            </Paper>
-          )}
+          {tab === 3 && <AdminEmailTemplates />}
 
           {/* User Management */}
           {tab === 4 && (
@@ -329,8 +343,10 @@ const AdminSettings = () => {
                         <TableCell>Name</TableCell>
                         <TableCell>Email</TableCell>
                         <TableCell>Role</TableCell>
+                        <TableCell align="center">POS PIN</TableCell>
                         <TableCell align="center">Status</TableCell>
                         <TableCell>Joined</TableCell>
+                        <TableCell align="center">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -344,10 +360,42 @@ const AdminSettings = () => {
                               sx={{ fontWeight: 600 }} />
                           </TableCell>
                           <TableCell align="center">
+                            {user.pin ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                                  {showPin[user.id] ? user.pin : '••••'}
+                                </Typography>
+                                <IconButton size="small" onClick={() => setShowPin(s => ({ ...s, [user.id]: !s[user.id] }))}>
+                                  {showPin[user.id] ? <VisibilityOff sx={{ fontSize: 16 }} /> : <Visibility sx={{ fontSize: 16 }} />}
+                                </IconButton>
+                                <IconButton size="small" onClick={() => { setPinDialog({ open: true, user }); setEditPin(user.pin || ''); }}>
+                                  <Edit sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Box>
+                            ) : (
+                              <Button size="small" variant="outlined" sx={{ fontSize: '0.7rem' }}
+                                onClick={() => { setPinDialog({ open: true, user }); setEditPin(''); }}>
+                                Set PIN
+                              </Button>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">
                             <Chip label={user.isActive ? 'Active' : 'Inactive'} size="small"
                               color={user.isActive ? 'success' : 'default'} variant="outlined" />
                           </TableCell>
                           <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell align="center">
+                            {user.role !== 'SUPER_ADMIN' && (
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setDeleteDialog({ open: true, user })}
+                                title="Delete user"
+                              >
+                                <Delete sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -376,7 +424,7 @@ const AdminSettings = () => {
               <TextField fullWidth label="Email" type="email" value={inviteForm.email}
                 onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
                 <Select value={inviteForm.role} label="Role"
@@ -388,11 +436,72 @@ const AdminSettings = () => {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField fullWidth label="POS PIN (optional)" value={inviteForm.pin}
+                onChange={e => setInviteForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                helperText="4-6 digit numeric PIN for POS login"
+                inputProps={{ maxLength: 6, inputMode: 'numeric' }} />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setInviteDialog(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleInvite}>Send Invite</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit PIN Dialog */}
+      <Dialog open={pinDialog.open} onClose={() => setPinDialog({ open: false, user: null })} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          {pinDialog.user?.pin ? 'Change' : 'Set'} POS PIN for {pinDialog.user?.firstName} {pinDialog.user?.lastName}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter a 4-6 digit numeric PIN that this user will use to log in to the POS system.
+          </Typography>
+          <TextField
+            fullWidth
+            label="POS PIN"
+            value={editPin}
+            onChange={e => setEditPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputProps={{ maxLength: 6, inputMode: 'numeric', style: { fontSize: '1.5rem', letterSpacing: '0.3em', textAlign: 'center', fontFamily: 'monospace' } }}
+            helperText={editPin.length > 0 && editPin.length < 4 ? 'PIN must be at least 4 digits' : '4-6 digits'}
+            error={editPin.length > 0 && editPin.length < 4}
+            autoFocus
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPinDialog({ open: false, user: null })}>Cancel</Button>
+          {pinDialog.user?.pin && (
+            <Button color="error" onClick={() => { setEditPin(''); handleSavePin(); }}>
+              Remove PIN
+            </Button>
+          )}
+          <Button variant="contained" onClick={handleSavePin}
+            disabled={editPin.length > 0 && editPin.length < 4}>
+            Save PIN
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, user: null })} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete User</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to permanently delete{' '}
+            <strong>{deleteDialog.user?.firstName} {deleteDialog.user?.lastName}</strong> ({deleteDialog.user?.email})?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog({ open: false, user: null })} disabled={deleting}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleDeleteUser} disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete User'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>

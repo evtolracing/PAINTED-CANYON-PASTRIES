@@ -164,14 +164,20 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
     let clientSecret = null;
     const effectivePayment = paymentMethod || 'STRIPE_CARD';
     const stripeKey = process.env.STRIPE_SECRET_KEY || '';
-    const stripeConfigured = stripeKey && !stripeKey.includes('placeholder') && stripeKey.startsWith('sk_');
+    const stripeConfigured = stripeKey && !stripeKey.includes('placeholder') && (stripeKey.startsWith('sk_') || stripeKey.startsWith('rk_'));
+    const orderSrc = source || 'web';
+
+    // Web orders MUST go through Stripe — refuse if not configured
+    if (effectivePayment === 'STRIPE_CARD' && !stripeConfigured) {
+      throw new AppError('Online payment is not available at this time. Please contact us to place your order.', 503);
+    }
 
     if (effectivePayment === 'STRIPE_CARD' && totalAmount > 0 && stripeConfigured) {
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalAmount * 100), // cents
           currency: 'usd',
-          metadata: { source: source || 'web' },
+          metadata: { source: orderSrc },
         });
         stripePaymentId = paymentIntent.id;
         clientSecret = paymentIntent.client_secret;
@@ -185,7 +191,7 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
           currency: 'usd',
           payment_method_types: ['card_present'],
           capture_method: 'automatic',
-          metadata: { source: source || 'pos' },
+          metadata: { source: orderSrc },
         });
         stripePaymentId = paymentIntent.id;
         clientSecret = paymentIntent.client_secret;
@@ -195,10 +201,11 @@ router.post('/', optionalAuth, validate(createOrderSchema), async (req, res, nex
     }
 
     // ── Create order in a transaction ──
+    // Only CASH, COMP, and PAY_LATER are considered paid up-front (no Stripe needed)
     const isCashOrComp = effectivePayment === 'CASH' || effectivePayment === 'COMP';
-    const skipStripe = !stripeConfigured && (effectivePayment === 'STRIPE_CARD' || effectivePayment === 'STRIPE_TERMINAL');
-    const paidUpFront = isCashOrComp || skipStripe;
-    const orderSrc = source || 'web';
+    const isPayLater = effectivePayment === 'PAY_LATER';
+    // Card payments are NOT marked as paid — the Stripe webhook marks them paid after confirmation
+    const paidUpFront = isCashOrComp;
 
     const result = await prisma.$transaction(async (tx) => {
       const orderNumber = await generateOrderNumber(tx);

@@ -10,7 +10,7 @@ import {
 import {
   Search, Add, Remove, Delete, ViewKanban, ViewList, FilterList, Refresh,
   AccessTime, Person, ShoppingBag, LocalShipping, DirectionsWalk,
-  StorefrontOutlined, AttachMoney, CreditCard, Close
+  StorefrontOutlined, AttachMoney, CreditCard, Close, Schedule
 } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
@@ -98,7 +98,7 @@ const AdminOrders = () => {
   const [manualSearch, setManualSearch] = useState('');
   const [manualCart, setManualCart] = useState([]);
   const [manualFulfillment, setManualFulfillment] = useState('PICKUP');
-  const [manualPayment, setManualPayment] = useState('CASH');
+  const [manualPayment, setManualPayment] = useState('PAY_LATER');
   const [manualCustomer, setManualCustomer] = useState({ firstName: '', lastName: '', email: '', phone: '' });
   const [manualNotes, setManualNotes] = useState('');
   const [manualPromo, setManualPromo] = useState('');
@@ -138,7 +138,7 @@ const AdminOrders = () => {
     setManualOpen(false);
     setManualCart([]);
     setManualFulfillment('PICKUP');
-    setManualPayment('CASH');
+    setManualPayment('PAY_LATER');
     setManualCustomer({ firstName: '', lastName: '', email: '', phone: '' });
     setManualNotes('');
     setManualPromo('');
@@ -520,8 +520,8 @@ const AdminOrders = () => {
               {/* Payment */}
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Payment</Typography>
               <ToggleButtonGroup value={manualPayment} exclusive onChange={(e, v) => v && setManualPayment(v)} fullWidth size="small" sx={{ mb: 1.5 }}>
+                <ToggleButton value="PAY_LATER"><Schedule sx={{ mr: 0.5, fontSize: 16 }} /> Pay Later</ToggleButton>
                 <ToggleButton value="CASH"><AttachMoney sx={{ mr: 0.5, fontSize: 16 }} /> Cash</ToggleButton>
-                <ToggleButton value="STRIPE_CARD"><CreditCard sx={{ mr: 0.5, fontSize: 16 }} /> Card</ToggleButton>
                 <ToggleButton value="COMP">Comp</ToggleButton>
               </ToggleButtonGroup>
 

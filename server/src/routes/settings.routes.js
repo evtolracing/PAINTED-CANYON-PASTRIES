@@ -41,6 +41,13 @@ router.get('/public', async (req, res, next) => {
   }
 });
 
+// GET /api/settings/stripe-config — public Stripe publishable key (no auth)
+router.get('/stripe-config', (req, res) => {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+  const configured = publishableKey && !publishableKey.includes('placeholder') && publishableKey.startsWith('pk_');
+  res.json({ success: true, data: { publishableKey: configured ? publishableKey : null } });
+});
+
 // GET /api/settings — get all settings (or specific key)
 router.get('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
@@ -93,6 +100,70 @@ router.put('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res
     });
 
     res.json({ success: true, data: upserted });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/settings/homepage — public endpoint for homepage curated products
+router.get('/homepage', async (req, res, next) => {
+  try {
+    const [bestSellersSetting, seasonalSetting] = await Promise.all([
+      prisma.setting.findUnique({ where: { key: 'homepage.bestSellers' } }),
+      prisma.setting.findUnique({ where: { key: 'homepage.seasonal' } }),
+    ]);
+
+    const bestSellerIds = bestSellersSetting?.value || [];
+    const seasonalIds = seasonalSetting?.value || [];
+
+    const productInclude = {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: 'asc' } },
+      variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+    };
+
+    // Fetch best sellers, seasonal, and products with images
+    const [bestSellers, seasonal, withImages] = await Promise.all([
+      bestSellerIds.length > 0
+        ? prisma.product.findMany({
+            where: { id: { in: bestSellerIds }, isActive: true },
+            include: productInclude,
+          })
+        : [],
+      seasonalIds.length > 0
+        ? prisma.product.findMany({
+            where: { id: { in: seasonalIds }, isActive: true },
+            include: productInclude,
+          })
+        : [],
+      prisma.product.findMany({
+        where: {
+          isActive: true,
+          images: { some: {} },
+        },
+        include: productInclude,
+        take: 12,
+        orderBy: { sortOrder: 'asc' },
+      }),
+    ]);
+
+    // Preserve the admin-chosen order for best sellers
+    const orderedBestSellers = bestSellerIds
+      .map(id => bestSellers.find(p => p.id === id))
+      .filter(Boolean);
+
+    const orderedSeasonal = seasonalIds
+      .map(id => seasonal.find(p => p.id === id))
+      .filter(Boolean);
+
+    res.json({
+      success: true,
+      data: {
+        bestSellers: orderedBestSellers,
+        seasonal: orderedSeasonal,
+        fromOurBakery: withImages,
+      },
+    });
   } catch (error) {
     next(error);
   }

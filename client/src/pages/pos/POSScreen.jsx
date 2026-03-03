@@ -11,6 +11,7 @@ import {
   Person, Lock
 } from '@mui/icons-material';
 import api from '../../services/api';
+import { getImageUrl } from '../../utils/imageUrl';
 
 const POSScreen = () => {
   const [authenticated, setAuthenticated] = useState(false);
@@ -24,6 +25,7 @@ const POSScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [bakeryLogo, setBakeryLogo] = useState(null);
 
   // Cart state
   const [cartItems, setCartItems] = useState([]);
@@ -50,12 +52,16 @@ const POSScreen = () => {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, settingsRes] = await Promise.all([
         api.get('/products?limit=200'),
         api.get('/categories'),
+        api.get('/settings/public'),
       ]);
       setProducts(productsRes.data.data || []);
       setCategories(categoriesRes.data.data || []);
+      if (settingsRes.data.data?.bakeryLogo) {
+        setBakeryLogo(settingsRes.data.data.bakeryLogo);
+      }
     } catch {
       // Use empty state
     } finally {
@@ -385,9 +391,26 @@ const POSScreen = () => {
                         justifyContent: 'center',
                         fontSize: '2rem',
                         mb: 1,
+                        overflow: 'hidden',
                       }}
                     >
-                      🧁
+                      {product.images?.[0]?.url ? (
+                        <Box
+                          component="img"
+                          src={getImageUrl(product.images[0].url)}
+                          alt={product.name}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : bakeryLogo ? (
+                        <Box
+                          component="img"
+                          src={getImageUrl(bakeryLogo)}
+                          alt="Logo"
+                          sx={{ width: '60%', height: '60%', objectFit: 'contain', opacity: 0.4 }}
+                        />
+                      ) : (
+                        '🧁'
+                      )}
                     </Box>
                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.3 }} noWrap>
                       {product.name}

@@ -261,6 +261,7 @@ enum PaymentMethod {
   STRIPE_TERMINAL
   CASH
   COMP
+  PAY_LATER
 }
 
 model Order {

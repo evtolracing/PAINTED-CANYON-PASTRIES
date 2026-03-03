@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const logger = require('../config/logger');
+const prisma = require('../config/database');
 
 let transporter;
 
@@ -35,6 +36,109 @@ const sendEmail = async ({ to, subject, html, text }) => {
     return null;
   }
 };
+
+// ── Helper: load a customized template from database ──────
+const loadTemplate = async (slug) => {
+  try {
+    const setting = await prisma.setting.findUnique({ where: { key: 'email.templates' } });
+    if (setting?.value) {
+      const templates = setting.value;
+      const tpl = templates.find(t => t.slug === slug);
+      if (tpl) return tpl;
+    }
+  } catch (err) {
+    logger.warn(`Could not load email template "${slug}" from DB, using hardcoded fallback: ${err.message}`);
+  }
+  return null;
+};
+
+// ── Helper: load bakery settings for merge tags ───────────
+const loadBakerySettings = async () => {
+  try {
+    const settings = await prisma.setting.findMany();
+    const map = {};
+    for (const s of settings) map[s.key] = s.value;
+    return {
+      bakeryName: map['bakery.name'] || 'Painted Canyon Pastries',
+      bakeryLocation: map['bakery.address'] || 'Joshua Tree, CA',
+    };
+  } catch {
+    return { bakeryName: 'Painted Canyon Pastries', bakeryLocation: 'Joshua Tree, CA' };
+  }
+};
+
+// ── Helper: interpolate merge tags ────────────────────────
+const interpolate = (template, data) => {
+  let result = template;
+  // Handle conditional blocks {{#tag}}...{{/tag}}
+  result = result.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (match, tag, content) => {
+    const val = data[`{{${tag}}}`];
+    if (val && val !== '$0.00' && val !== '0' && val !== '') {
+      // Recursively interpolate content inside the block
+      return interpolate(content, data);
+    }
+    return '';
+  });
+  // Replace simple tags
+  for (const [tag, value] of Object.entries(data)) {
+    result = result.split(tag).join(value || '');
+  }
+  return result;
+};
+
+// ── Build order items HTML table ──────────────────────────
+const buildOrderItemsTable = (order) => {
+  const itemsHtml = order.items?.map(item => `
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3;">
+        ${item.product?.name || 'Item'}${item.variant ? ` - ${item.variant.name}` : ''}
+      </td>
+      <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: center;">${item.quantity}</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: right;">$${Number(item.totalPrice).toFixed(2)}</td>
+    </tr>
+  `).join('') || '';
+
+  return `<table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #3e2723;">
+    <thead>
+      <tr style="border-bottom: 2px solid #c4956a;">
+        <th style="text-align: left; padding: 8px 0;">Item</th>
+        <th style="text-align: center; padding: 8px 0;">Qty</th>
+        <th style="text-align: right; padding: 8px 0;">Price</th>
+      </tr>
+    </thead>
+    <tbody>${itemsHtml}</tbody>
+  </table>`;
+};
+
+// ── Build merge data for an order ─────────────────────────
+const buildOrderMergeData = (order, bakery, statusMessage) => {
+  const fulfillmentLabel = order.fulfillmentType === 'DELIVERY' ? '🚗 Delivery' : '🏪 Pickup';
+  const scheduledDate = order.scheduledDate
+    ? new Date(order.scheduledDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    : 'Date TBD';
+
+  return {
+    '{{bakeryName}}': bakery.bakeryName,
+    '{{bakeryLocation}}': bakery.bakeryLocation,
+    '{{orderNumber}}': order.orderNumber || '',
+    '{{customerName}}': order.customer?.firstName || order.guestName?.split(' ')[0] || 'Customer',
+    '{{fulfillmentLabel}}': fulfillmentLabel,
+    '{{scheduledDate}}': scheduledDate,
+    '{{scheduledSlot}}': order.scheduledSlot || '',
+    '{{orderItemsTable}}': buildOrderItemsTable(order),
+    '{{subtotal}}': `$${Number(order.subtotal).toFixed(2)}`,
+    '{{deliveryFee}}': Number(order.deliveryFee) > 0 ? `$${Number(order.deliveryFee).toFixed(2)}` : '',
+    '{{taxAmount}}': Number(order.taxAmount) > 0 ? `$${Number(order.taxAmount).toFixed(2)}` : '',
+    '{{tipAmount}}': Number(order.tipAmount) > 0 ? `$${Number(order.tipAmount).toFixed(2)}` : '',
+    '{{discountAmount}}': Number(order.discountAmount) > 0 ? `$${Number(order.discountAmount).toFixed(2)}` : '',
+    '{{totalAmount}}': `$${Number(order.totalAmount).toFixed(2)}`,
+    '{{statusMessage}}': statusMessage || '',
+    '{{deliveryAddress}}': order.deliveryAddress || '',
+    '{{shopUrl}}': process.env.CLIENT_URL || 'http://localhost:3000/shop',
+  };
+};
+
+// ── Hardcoded fallbacks (existing templates kept for safety) ─
 
 const orderConfirmationTemplate = (order) => {
   const itemsHtml = order.items?.map(item => `
@@ -127,11 +231,22 @@ const sendOrderConfirmation = async (order) => {
   const email = order.customer?.email || order.guestEmail;
   if (!email) return;
 
-  return sendEmail({
-    to: email,
-    subject: `Order Confirmed - #${order.orderNumber} | Painted Canyon Pastries`,
-    html: orderConfirmationTemplate(order),
-  });
+  // Try loading customized template from DB
+  const bakery = await loadBakerySettings();
+  const dbTemplate = await loadTemplate('order-confirmation');
+
+  let subject, html;
+  if (dbTemplate) {
+    const mergeData = buildOrderMergeData(order, bakery);
+    subject = interpolate(dbTemplate.subject, mergeData);
+    html = interpolate(dbTemplate.body, mergeData);
+  } else {
+    // Fallback to hardcoded
+    subject = `Order Confirmed - #${order.orderNumber} | ${bakery.bakeryName}`;
+    html = orderConfirmationTemplate(order);
+  }
+
+  return sendEmail({ to: email, subject, html });
 };
 
 const sendOrderStatusUpdate = async (order, status) => {
@@ -147,22 +262,62 @@ const sendOrderStatusUpdate = async (order, status) => {
     REFUNDED: 'Your order has been refunded.',
     CANCELLED: 'Your order has been cancelled.',
   };
+  const statusMessage = statusMessages[status] || `Status: ${status}`;
 
-  return sendEmail({
-    to: email,
-    subject: `Order Update - #${order.orderNumber} | Painted Canyon Pastries`,
-    html: orderStatusTemplate(order, statusMessages[status] || `Status: ${status}`),
-  });
+  const bakery = await loadBakerySettings();
+
+  // For OUT_FOR_DELIVERY, try delivery-notification template first
+  if (status === 'OUT_FOR_DELIVERY') {
+    const deliveryTpl = await loadTemplate('delivery-notification');
+    if (deliveryTpl) {
+      const mergeData = buildOrderMergeData(order, bakery, statusMessage);
+      return sendEmail({
+        to: email,
+        subject: interpolate(deliveryTpl.subject, mergeData),
+        html: interpolate(deliveryTpl.body, mergeData),
+      });
+    }
+  }
+
+  // Use status-update template from DB
+  const dbTemplate = await loadTemplate('order-status-update');
+
+  let subject, html;
+  if (dbTemplate) {
+    const mergeData = buildOrderMergeData(order, bakery, statusMessage);
+    subject = interpolate(dbTemplate.subject, mergeData);
+    html = interpolate(dbTemplate.body, mergeData);
+  } else {
+    subject = `Order Update - #${order.orderNumber} | ${bakery.bakeryName}`;
+    html = orderStatusTemplate(order, statusMessage);
+  }
+
+  return sendEmail({ to: email, subject, html });
 };
 
 const sendLowInventoryAlert = async (item) => {
   const adminEmail = process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER;
   if (!adminEmail) return;
 
-  return sendEmail({
-    to: adminEmail,
-    subject: `⚠️ Low Inventory: ${item.name}`,
-    html: `
+  const bakery = await loadBakerySettings();
+  const dbTemplate = await loadTemplate('low-inventory-alert');
+
+  let subject, html;
+  if (dbTemplate) {
+    const mergeData = {
+      '{{bakeryName}}': bakery.bakeryName,
+      '{{bakeryLocation}}': bakery.bakeryLocation,
+      '{{itemName}}': item.name,
+      '{{currentStock}}': String(item.currentStock),
+      '{{unit}}': item.unit || '',
+      '{{reorderThreshold}}': String(item.reorderThreshold),
+      '{{inventoryUrl}}': `${process.env.CLIENT_URL || 'http://localhost:3000'}/admin/inventory`,
+    };
+    subject = interpolate(dbTemplate.subject, mergeData);
+    html = interpolate(dbTemplate.body, mergeData);
+  } else {
+    subject = `⚠️ Low Inventory: ${item.name}`;
+    html = `
       <div style="font-family: sans-serif; padding: 20px;">
         <h2>Low Inventory Alert</h2>
         <p><strong>${item.name}</strong> is below reorder threshold.</p>
@@ -170,8 +325,42 @@ const sendLowInventoryAlert = async (item) => {
         <p>Threshold: ${item.reorderThreshold} ${item.unit}</p>
         <p><a href="${process.env.CLIENT_URL}/admin/inventory">View Inventory</a></p>
       </div>
-    `,
-  });
+    `;
+  }
+
+  return sendEmail({ to: adminEmail, subject, html });
+};
+
+// ── Welcome email (new) ──────────────────────────────────
+const sendWelcomeEmail = async (customer) => {
+  const email = customer.email;
+  if (!email) return;
+
+  const bakery = await loadBakerySettings();
+  const dbTemplate = await loadTemplate('welcome');
+
+  let subject, html;
+  if (dbTemplate) {
+    const mergeData = {
+      '{{bakeryName}}': bakery.bakeryName,
+      '{{bakeryLocation}}': bakery.bakeryLocation,
+      '{{customerName}}': customer.firstName || 'there',
+      '{{shopUrl}}': `${process.env.CLIENT_URL || 'http://localhost:3000'}/shop`,
+    };
+    subject = interpolate(dbTemplate.subject, mergeData);
+    html = interpolate(dbTemplate.body, mergeData);
+  } else {
+    subject = `Welcome to ${bakery.bakeryName}! 🧁`;
+    html = `
+      <div style="font-family: Georgia, serif; text-align: center; padding: 40px 20px; background: #faf7f2;">
+        <h2 style="color: #3e2723;">Welcome, ${customer.firstName || 'there'}!</h2>
+        <p style="color: #5d4037;">Thanks for joining ${bakery.bakeryName}.</p>
+        <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/shop" style="display: inline-block; background: #c4956a; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Start Shopping →</a>
+      </div>
+    `;
+  }
+
+  return sendEmail({ to: email, subject, html });
 };
 
 module.exports = {
@@ -179,6 +368,9 @@ module.exports = {
   sendOrderConfirmation,
   sendOrderStatusUpdate,
   sendLowInventoryAlert,
+  sendWelcomeEmail,
   orderConfirmationTemplate,
   orderStatusTemplate,
+  loadTemplate,
+  interpolate,
 };

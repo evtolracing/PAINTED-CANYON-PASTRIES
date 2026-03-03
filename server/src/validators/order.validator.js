@@ -29,7 +29,7 @@ const createOrderSchema = Joi.object({
   deliveryNotes: Joi.string().max(500).allow('', null),
 
   // Payment
-  paymentMethod: Joi.string().valid('STRIPE_CARD', 'STRIPE_TERMINAL', 'CASH', 'COMP').default('STRIPE_CARD'),
+  paymentMethod: Joi.string().valid('STRIPE_CARD', 'STRIPE_TERMINAL', 'CASH', 'COMP', 'PAY_LATER').default('STRIPE_CARD'),
   stripePaymentIntentId: Joi.string().allow(null),
 
   // Tips and promos

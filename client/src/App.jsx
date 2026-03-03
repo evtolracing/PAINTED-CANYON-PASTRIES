@@ -49,6 +49,7 @@ import AdminAI from './pages/admin/AdminAI';
 import AdminRecipes from './pages/admin/AdminRecipes';
 import AdminRecipeEdit from './pages/admin/AdminRecipeEdit';
 import AdminDeliveryCalendar from './pages/admin/AdminDeliveryCalendar';
+import AdminHomepage from './pages/admin/AdminHomepage';
 
 // POS
 import POSScreen from './pages/pos/POSScreen';
@@ -106,6 +107,7 @@ function App() {
                   <Route path="promos" element={<AdminPromos />} />
                   <Route path="knowledge-base" element={<AdminKnowledgeBase />} />
                   <Route path="analytics" element={<AdminAnalytics />} />
+                  <Route path="homepage" element={<AdminHomepage />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="ai" element={<AdminAI />} />
                   <Route path="recipes" element={<AdminRecipes />} />

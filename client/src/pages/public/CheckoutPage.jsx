@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Box, Container, Typography, Grid, Button, Paper, Stack, Stepper, Step,
@@ -8,8 +8,10 @@ import {
 } from '@mui/material';
 import {
   LocalShipping, Storefront, Schedule, CheckCircle, ArrowBack,
-  ArrowForward,
+  ArrowForward, CreditCard,
 } from '@mui/icons-material';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -20,7 +22,23 @@ const TIP_OPTIONS = [0, 2, 5, 10];
 const TAX_RATE = 0.0825;
 const DELIVERY_FEE = 5.00;
 
-const CheckoutPage = () => {
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#424770',
+      fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+      '::placeholder': { color: '#aab7c4' },
+      padding: '12px',
+    },
+    invalid: { color: '#e53e3e' },
+  },
+};
+
+/* ─── Inner checkout form (has access to useStripe / useElements) ─── */
+const CheckoutForm = ({ stripeReady }) => {
+  const stripe = useStripe();
+  const elements = useElements();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { items, subtotal, clearCart } = useCart();
@@ -28,6 +46,9 @@ const CheckoutPage = () => {
 
   const [activeStep, setActiveStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardError, setCardError] = useState('');
+  const orderCompleteRef = React.useRef(false);
 
   // Step 1 - Fulfillment
   const [fulfillment, setFulfillment] = useState('PICKUP');
@@ -54,11 +75,13 @@ const CheckoutPage = () => {
   // Step 4 - Notes
   const [notes, setNotes] = useState('');
 
+  // Redirect to cart ONLY on initial mount if cart is empty (not after clearCart)
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !orderCompleteRef.current) {
       navigate('/cart');
     }
-  }, [items, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (activeStep === 1) {
@@ -125,6 +148,16 @@ const CheckoutPage = () => {
       showSnackbar('Please select a time slot.', 'error');
       return false;
     }
+    if (activeStep === 2 && stripeReady) {
+      if (!cardComplete) {
+        showSnackbar('Please enter your card details.', 'error');
+        return false;
+      }
+      if (cardError) {
+        showSnackbar('Please fix the card error before continuing.', 'error');
+        return false;
+      }
+    }
     return true;
   };
 
@@ -141,6 +174,10 @@ const CheckoutPage = () => {
   const total = Math.round((taxableAmount + taxAmount + deliveryFee + tip) * 100) / 100;
 
   const handlePlaceOrder = async () => {
+    if (!stripe || !elements) {
+      showSnackbar('Payment system is loading. Please wait a moment and try again.', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const deliveryStr = fulfillment === 'DELIVERY'
@@ -170,10 +207,50 @@ const CheckoutPage = () => {
         guestLastName: !user ? guestInfo.lastName : undefined,
         guestPhone: !user ? guestInfo.phone : undefined,
       };
+
+      // Step 1: Create order on server (also creates Stripe PaymentIntent)
       const { data } = await api.post('/orders', orderData);
-      clearCart();
+      const clientSecret = data.data?.clientSecret;
       const orderNum = data.data?.order?.orderNumber || data.data?.orderNumber || 'success';
-      navigate(`/order-confirmation/${orderNum}`);
+
+      // Step 2: clientSecret MUST be returned for card payments
+      if (!clientSecret) {
+        showSnackbar('Payment could not be initiated. Please try again or contact us.', 'error');
+        return;
+      }
+
+      // Step 3: Confirm the payment with Stripe (handles 3D Secure etc.)
+      const cardElement = elements.getElement(CardElement);
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: user
+              ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+              : `${guestInfo.firstName} ${guestInfo.lastName}`.trim(),
+            email: user?.email || guestInfo.email || undefined,
+          },
+        },
+      });
+
+      if (stripeError) {
+        // Payment failed — order exists but is unpaid, server webhook will handle cleanup
+        showSnackbar(stripeError.message || 'Payment failed. Please try again.', 'error');
+        return;
+      }
+
+      if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
+        // Payment successful — mark order complete and navigate
+        orderCompleteRef.current = true;
+        clearCart();
+        navigate(`/order-confirmation/${orderNum}`);
+      } else if (paymentIntent.status === 'requires_action') {
+        // 3D Secure or additional authentication may be needed — Stripe SDK handles it
+        // If we reach here, confirmCardPayment should have already handled the modal
+        showSnackbar('Additional authentication required. Please complete the verification.', 'info');
+      } else {
+        showSnackbar('Payment was not completed. Please try again.', 'error');
+      }
     } catch (err) {
       showSnackbar(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to place order. Please try again.', 'error');
     } finally {
@@ -336,20 +413,41 @@ const CheckoutPage = () => {
             <Stack spacing={3}>
               <Typography variant="h5">Payment</Typography>
 
-              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: 'rgba(124,139,111,0.06)' }}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <CheckCircle sx={{ fontSize: 36, color: 'success.main' }} />
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={600}>
-                      {fulfillment === 'DELIVERY' ? 'Pay on Delivery' : 'Pay at Pickup'}
+              {stripeReady ? (
+                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                  <Stack spacing={2}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <CreditCard color="primary" />
+                      <Typography variant="subtitle1" fontWeight={600}>Credit / Debit Card</Typography>
+                    </Stack>
+                    <Box sx={{
+                      border: '1px solid',
+                      borderColor: cardError ? 'error.main' : 'divider',
+                      borderRadius: 2,
+                      p: 2,
+                      '&:focus-within': { borderColor: 'primary.main', boxShadow: '0 0 0 1px rgba(196,149,106,0.3)' },
+                    }}>
+                      <CardElement
+                        options={CARD_ELEMENT_OPTIONS}
+                        onChange={(e) => {
+                          setCardComplete(e.complete);
+                          setCardError(e.error ? e.error.message : '');
+                        }}
+                      />
+                    </Box>
+                    {cardError && (
+                      <Typography variant="caption" color="error">{cardError}</Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary">
+                      Your payment is processed securely by Stripe. We never store your card details.
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Payment will be collected when you {fulfillment === 'DELIVERY' ? 'receive your delivery' : 'pick up your order'}.
-                      Cash and card accepted.
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Paper>
+                  </Stack>
+                </Paper>
+              ) : (
+                <Alert severity="warning">
+                  Online payment is not currently available. Please contact us to place your order.
+                </Alert>
+              )}
 
               <Box>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Add a Tip</Typography>
@@ -497,15 +595,73 @@ const CheckoutPage = () => {
                 variant="contained"
                 size="large"
                 onClick={handlePlaceOrder}
-                disabled={submitting}
+                disabled={submitting || (stripeReady && !cardComplete)}
                 startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
                 sx={{ borderRadius: 2, px: 4 }}
               >
-                {submitting ? 'Placing Order…' : 'Place Order'}
+                {submitting ? 'Processing Payment…' : `Pay $${total.toFixed(2)}`}
               </Button>
             )}
           </Stack>
         </Paper>
+      </Container>
+    </Box>
+  );
+};
+
+/* ─── Wrapper that loads Stripe and provides Elements context ─── */
+const CheckoutPage = () => {
+  const [stripePromise, setStripePromise] = useState(null);
+  const [stripeReady, setStripeReady] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const { data } = await api.get('/settings/stripe-config');
+        const pk = data.data?.publishableKey;
+        if (pk) {
+          setStripePromise(loadStripe(pk));
+          setStripeReady(true);
+        }
+      } catch {
+        // Stripe not configured
+      } finally {
+        setStripeLoading(false);
+      }
+    };
+    init();
+  }, []);
+
+  // Show loading while Stripe is being fetched
+  if (stripeLoading) {
+    return (
+      <Box sx={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Stack alignItems="center" spacing={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading checkout...</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // Stripe loaded — wrap in Elements
+  if (stripeReady && stripePromise) {
+    return (
+      <Elements stripe={stripePromise}>
+        <CheckoutForm stripeReady />
+      </Elements>
+    );
+  }
+
+  // Stripe not available — show error, don't render checkout without payment
+  return (
+    <Box sx={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Container maxWidth="sm" sx={{ textAlign: 'center' }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Online payment is currently unavailable. Please contact us to place your order.
+        </Alert>
+        <Button component={Link} to="/shop" variant="contained">Back to Shop</Button>
       </Container>
     </Box>
   );

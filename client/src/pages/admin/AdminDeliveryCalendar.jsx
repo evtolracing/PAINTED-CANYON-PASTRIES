@@ -18,6 +18,21 @@ import {
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
 
+/**
+ * Parse a scheduledDate string (ISO or YYYY-MM-DD) into a local Date at noon,
+ * so timezone offsets never shift the day.
+ */
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return null;
+  // Extract YYYY-MM-DD portion whether it's a full ISO string or just a date
+  const ymd = dateStr.slice(0, 10); // "2026-03-10"
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0); // noon local time
+};
+
+/** Extract the YYYY-MM-DD key from a scheduledDate string without timezone conversion */
+const dateKey = (dateStr) => dateStr ? dateStr.slice(0, 10) : null;
+
 /* ── status config ─────────────────────────────────────────── */
 const STATUS_COLORS = {
   NEW:              { bg: '#e3f2fd', border: '#1976d2', text: '#0d47a1',   label: 'New' },
@@ -296,7 +311,7 @@ const OrderDetailDialog = ({ order, open, onClose }) => {
           <Box>
             <Typography color="text.secondary" variant="caption">Scheduled Date</Typography>
             <Typography fontWeight={600}>
-              {order.scheduledDate ? format(parseISO(order.scheduledDate), 'MMM d, yyyy') : 'Not scheduled'}
+              {order.scheduledDate ? format(parseLocalDate(order.scheduledDate), 'MMM d, yyyy') : 'Not scheduled'}
             </Typography>
           </Box>
           <Box>
@@ -408,7 +423,7 @@ const AdminDeliveryCalendar = () => {
         prev.map(o => o.id === orderId ? { ...o, scheduledDate: `${newDateStr}T00:00:00.000Z` } : o)
       );
 
-      showSnackbar(`Order ${orderNumber || ''} moved to ${format(new Date(newDateStr), 'MMM d, yyyy')}`, 'success');
+      showSnackbar(`Order ${orderNumber || ''} moved to ${format(parseLocalDate(newDateStr), 'MMM d, yyyy')}`, 'success');
     } catch (err) {
       showSnackbar(err.response?.data?.message || err.response?.data?.error?.message || 'Failed to reschedule order', 'error');
       fetchOrders(); // revert on failure
@@ -438,7 +453,8 @@ const AdminDeliveryCalendar = () => {
     const map = {};
     for (const order of orders) {
       if (!order.scheduledDate) continue;
-      const key = format(parseISO(order.scheduledDate), 'yyyy-MM-dd');
+      const key = dateKey(order.scheduledDate);
+      if (!key) continue;
       if (!map[key]) map[key] = [];
       map[key].push(order);
     }
@@ -458,7 +474,7 @@ const AdminDeliveryCalendar = () => {
     const monthEnd = endOfMonth(currentMonth);
     const inMonth = orders.filter(o => {
       if (!o.scheduledDate) return false;
-      const d = parseISO(o.scheduledDate);
+      const d = parseLocalDate(o.scheduledDate);
       return d >= monthStart && d <= monthEnd;
     });
     const deliveries = inMonth.filter(o => o.fulfillmentType === 'DELIVERY').length;

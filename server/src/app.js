@@ -32,6 +32,7 @@ const newsletterRoutes = require('./routes/newsletter.routes');
 const cateringRoutes = require('./routes/catering.routes');
 const contactRoutes = require('./routes/contact.routes');
 const recipeRoutes = require('./routes/recipe.routes');
+const emailTemplateRoutes = require('./routes/email-template.routes');
 
 const app = express();
 
@@ -110,6 +111,7 @@ app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/catering', cateringRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/recipes', recipeRoutes);
+app.use('/api/email-templates', emailTemplateRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
