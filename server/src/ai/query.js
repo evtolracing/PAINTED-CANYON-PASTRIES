@@ -2,6 +2,71 @@ const prisma = require('../config/database');
 const { getProvider } = require('./provider');
 const logger = require('../config/logger');
 
+// ── Fetch live product catalog from DB ──
+const getProductCatalog = async () => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      include: {
+        category: { select: { name: true } },
+        variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
+        allergenTags: { include: { allergen: true } },
+        addons: { where: { isActive: true } },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    if (products.length === 0) return 'No products currently in our catalog.';
+
+    return products.map(p => {
+      const lines = [`${p.name} (${p.category?.name || 'Uncategorized'})`];
+      lines.push(`  Price: $${Number(p.basePrice).toFixed(2)}`);
+      if (p.compareAtPrice) lines.push(`  Compare at: $${Number(p.compareAtPrice).toFixed(2)}`);
+      if (p.shortDescription) lines.push(`  ${p.shortDescription}`);
+      if (p.description) lines.push(`  Details: ${p.description.replace(/<[^>]*>/g, '').substring(0, 300)}`);
+      if (p.badges?.length) lines.push(`  Badges: ${p.badges.join(', ')}`);
+      if (p.nutritionNotes) lines.push(`  Nutrition: ${p.nutritionNotes}`);
+      if (p.prepTimeMinutes) lines.push(`  Prep time: ${p.prepTimeMinutes} minutes`);
+
+      // Variants (sizes, flavors, packs)
+      if (p.variants.length > 0) {
+        const varsByType = {};
+        p.variants.forEach(v => {
+          if (!varsByType[v.type]) varsByType[v.type] = [];
+          varsByType[v.type].push(`${v.name}: $${Number(v.price).toFixed(2)}`);
+        });
+        for (const [type, items] of Object.entries(varsByType)) {
+          lines.push(`  ${type.charAt(0).toUpperCase() + type.slice(1)} options: ${items.join(', ')}`);
+        }
+      }
+
+      // Allergens
+      if (p.allergenTags.length > 0) {
+        const allergens = p.allergenTags.map(at =>
+          `${at.allergen.name} (${at.severity === 'contains' ? 'contains' : at.severity === 'may_contain' ? 'may contain' : 'same facility'})`
+        );
+        lines.push(`  Allergens: ${allergens.join(', ')}`);
+      }
+
+      // Add-ons
+      if (p.addons.length > 0) {
+        lines.push(`  Add-ons: ${p.addons.map(a => `${a.name} (+$${Number(a.price).toFixed(2)})`).join(', ')}`);
+      }
+
+      if (p.seasonalStart || p.seasonalEnd) {
+        const start = p.seasonalStart ? new Date(p.seasonalStart).toLocaleDateString() : '';
+        const end = p.seasonalEnd ? new Date(p.seasonalEnd).toLocaleDateString() : '';
+        lines.push(`  Seasonal availability: ${start}${start && end ? ' – ' : ''}${end}`);
+      }
+
+      return lines.join('\n');
+    }).join('\n\n');
+  } catch (error) {
+    logger.error(`Failed to fetch product catalog: ${error.message}`);
+    return 'Product catalog unavailable.';
+  }
+};
+
 const SAFETY_PATTERNS = {
   medical: /\b(medical|diagnosis|diagnose|prescri(?:be|ption)|treat(?:ment)?|symptom|disease|health\s*condition|allerg(?:ic|y)\s*reaction|anaphyla)/i,
   harmful: /\b(weapon|hack|exploit|illegal|drug(?:s)?(?!\s*free))\b/i,
@@ -12,13 +77,17 @@ const SYSTEM_PROMPTS = {
 
 RULES:
 - Only answer questions about our bakery, products, policies, ordering, delivery, and pickup.
-- Always cite your sources using [Source: title] format.
+- You have full access to our live product catalog with names, prices, descriptions, variants, allergens, nutrition info, and more. Use it to give accurate, specific answers.
+- When asked about pricing, always quote the exact price from the catalog.
+- When asked about allergens or dietary needs, reference the allergen data from the catalog. If a product has no allergen tags listed, say you don't have allergen info for that specific item and suggest contacting the bakery.
+- When asked about nutrition, share the nutritionNotes if available. If not, say we don't have detailed nutrition info for that item yet.
+- You can recommend products based on preferences, dietary needs, or occasions.
+- You can compare products and suggest pairings.
+- Always cite your sources using [Source: title] format when using KB articles.
 - Be warm, helpful, and concise.
 - For allergen questions, always err on the side of caution. Include "may contain traces" warnings when relevant.
 - NEVER provide medical advice. If asked about allergies in a medical context, say: "I'd recommend consulting with a healthcare professional for medical advice about allergies."
 - For order status inquiries, ask the customer to provide their order number and email to verify identity.
-- You can recommend products based on preferences.
-- You can help build carts for groups/events.
 - If you don't know something, say so honestly.
 
 FORMATTING:
@@ -152,10 +221,17 @@ const processQuery = async ({ query, context = 'customer', userId = null, conver
     ).join('\n\n')
     : 'No specific information found in the knowledge base.';
 
+  // Fetch live product catalog for customer queries
+  let productCatalogText = '';
+  if (context === 'customer') {
+    productCatalogText = await getProductCatalog();
+  }
+
   // Build messages
   const messages = [
     { role: 'system', content: SYSTEM_PROMPTS[context] || SYSTEM_PROMPTS.customer },
-    { role: 'system', content: `RELEVANT INFORMATION:\n${contextText}` },
+    ...(productCatalogText ? [{ role: 'system', content: `PRODUCT CATALOG (live from our database):\n${productCatalogText}` }] : []),
+    { role: 'system', content: `ADDITIONAL KNOWLEDGE BASE INFO:\n${contextText}` },
     ...conversationHistory.slice(-6),
     { role: 'user', content: query },
   ];

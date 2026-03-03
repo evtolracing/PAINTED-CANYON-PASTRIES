@@ -65,7 +65,7 @@ const AIAssistantWidget = ({ context = 'customer' }) => {
   };
 
   const quickQuestions = context === 'customer'
-    ? ['What are your best sellers?', 'Do you deliver to my area?', 'Any gluten-free options?']
+    ? ['What are your best sellers?', 'Any gluten-free options?', 'What are your prices?', 'Do you deliver?']
     : ['Show today\'s orders', 'Low inventory items', 'Draft a delay email'];
 
   return (
