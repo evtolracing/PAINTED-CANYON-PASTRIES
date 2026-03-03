@@ -257,6 +257,66 @@ async function generateImageWithGemini(prompt) {
   };
 }
 
+/**
+ * Generate an AI background for a product image using Gemini.
+ * Sends the original image + a text prompt asking Gemini to replace/enhance the background.
+ * Returns { data: base64String, mimeType: 'image/png' }
+ */
+async function generateBackgroundWithGemini(imageBase64, imageMimeType, productName) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
+
+  const model = 'gemini-2.5-flash-preview-05-20';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const prompt = `You are a professional food photographer and photo editor for a premium artisan bakery called "Painted Canyon Pastries".
+
+Take this product image and create a beautiful, professional version with an enhanced background. Rules:
+1. Keep the product/food item EXACTLY as it appears — do NOT alter the product itself
+2. Replace or enhance the background with a warm, inviting bakery-themed setting
+3. Use soft, warm lighting that makes the product look appetizing
+4. Background ideas: rustic wooden surface, marble countertop, parchment paper, flour-dusted surface, elegant bakery display, warm kitchen setting
+5. The result should look like a professional product photo for an upscale bakery website
+6. Make sure the product is the clear focal point
+${productName ? `7. This product is: ${productName}` : ''}
+
+Return ONLY the edited image with the enhanced background.`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: imageMimeType,
+              data: imageBase64,
+            },
+          },
+        ],
+      }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(`Gemini background generation error: ${err.error?.message || response.statusText}`);
+  }
+
+  const result = await response.json();
+  const parts = result.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find(p => p.inlineData);
+  if (!imagePart) throw new Error('No image returned by Gemini. The prompt may have been blocked or the image could not be processed.');
+
+  return {
+    data: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || 'image/png',
+  };
+}
+
 const getProvider = (providerName) => {
   const name = providerName || process.env.AI_PROVIDER || 'openai';
   switch (name.toLowerCase()) {
@@ -272,4 +332,4 @@ const getProvider = (providerName) => {
   }
 };
 
-module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, DeepSeekProvider, GeminiProvider, getProvider, generateImageWithGemini };
+module.exports = { AIProvider, OpenAIProvider, AnthropicProvider, DeepSeekProvider, GeminiProvider, getProvider, generateImageWithGemini, generateBackgroundWithGemini };

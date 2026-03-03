@@ -7,7 +7,7 @@ import {
   TableHead, TableRow, Checkbox, OutlinedInput, ImageList, ImageListItem,
   ImageListItemBar, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
-import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder, AutoAwesome } from '@mui/icons-material';
+import { ArrowBack, Add, Delete, Save, Cancel, CloudUpload, Star, StarBorder, AutoAwesome, Wallpaper } from '@mui/icons-material';
 import api from '../../services/api';
 import { useSnackbar } from '../../context/SnackbarContext';
 import { getImageUrl } from '../../utils/imageUrl';
@@ -39,6 +39,8 @@ const AdminProductEdit = () => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const imageInputRef = useRef(null);
+  const [generatingBg, setGeneratingBg] = useState({});
+  const [autoGenBg, setAutoGenBg] = useState(true);
 
   const [aiImageDialog, setAiImageDialog] = useState(false);
   const [aiImagePrompt, setAiImagePrompt] = useState('');
@@ -111,6 +113,48 @@ const AdminProductEdit = () => {
   const removeAddon = (idx) => setAddons(a => a.filter((_, i) => i !== idx));
   const updateAddon = (idx, field, val) => setAddons(a => a.map((item, i) => i === idx ? { ...item, [field]: val } : item));
 
+  // Generate AI background for a specific image (by image ID or pending file)
+  const handleGenerateBackground = async (imageId, imageFile) => {
+    const bgKey = imageId || `pending-${Date.now()}`;
+    setGeneratingBg(prev => ({ ...prev, [bgKey]: true }));
+    try {
+      const bgFormData = new FormData();
+      if (imageFile) {
+        bgFormData.append('image', imageFile);
+      } else {
+        // For existing images, fetch the image and send it
+        const img = productImages.find(i => i.id === imageId);
+        if (!img) throw new Error('Image not found');
+        const imgUrl = getImageUrl(img.url);
+        const resp = await fetch(imgUrl);
+        const blob = await resp.blob();
+        bgFormData.append('image', blob, 'product-image.jpg');
+      }
+      bgFormData.append('productName', form.name || '');
+
+      const { data } = await api.post('/ai/enhance-background', bgFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
+      });
+      const enhancedUrl = data.data?.url;
+      if (!enhancedUrl) throw new Error('No URL returned');
+
+      if (isNew) {
+        // Add AI-enhanced image as a pending URL entry
+        setProductImages(prev => [...prev, { id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: false, isAI: true, isBgEnhanced: true }]);
+      } else {
+        // Attach to existing product via URL endpoint
+        const { data: imgData } = await api.post(`/products/${id}/images/url`, { url: enhancedUrl });
+        setProductImages(prev => [...prev, ...(imgData.data ? [{ ...imgData.data, isBgEnhanced: true }] : [{ id: `ai-bg-${Date.now()}`, url: enhancedUrl, isPrimary: false, isBgEnhanced: true }])]);
+      }
+      showSnackbar('AI background generated!', 'success');
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Background generation failed', 'error');
+    } finally {
+      setGeneratingBg(prev => { const n = { ...prev }; delete n[bgKey]; return n; });
+    }
+  };
+
   const handleImageUpload = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -124,20 +168,34 @@ const AdminProductEdit = () => {
       }));
       setPendingFiles(prev => [...prev, ...fileArray]);
       if (imageInputRef.current) imageInputRef.current.value = '';
+
+      // Auto-generate backgrounds for each file
+      if (autoGenBg) {
+        fileArray.forEach(pf => handleGenerateBackground(null, pf.file));
+      }
       return;
     }
 
     const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append('images', files[i]);
+    const fileList = Array.from(files);
+    for (let i = 0; i < fileList.length; i++) {
+      formData.append('images', fileList[i]);
     }
     setUploadingImages(true);
     try {
       const { data } = await api.post(`/products/${id}/images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setProductImages(prev => [...prev, ...(data.data || [])]);
+      const uploaded = data.data || [];
+      setProductImages(prev => [...prev, ...uploaded]);
       showSnackbar('Images uploaded!', 'success');
+
+      // Auto-generate AI backgrounds for each uploaded image
+      if (autoGenBg) {
+        for (let i = 0; i < fileList.length; i++) {
+          handleGenerateBackground(null, fileList[i]);
+        }
+      }
     } catch (err) {
       showSnackbar(err.response?.data?.message || 'Failed to upload images', 'error');
     } finally {
@@ -457,18 +515,49 @@ const AdminProductEdit = () => {
 
           {/* Image Upload Area */}
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Images</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Images</Typography>
+              <FormControlLabel
+                control={<Switch size="small" checked={autoGenBg} onChange={e => setAutoGenBg(e.target.checked)} />}
+                label={<Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Wallpaper fontSize="small" /> Auto AI Background</Typography>}
+                sx={{ mr: 0 }}
+              />
+            </Box>
+
+            {/* AI Background generation progress */}
+            {Object.keys(generatingBg).length > 0 && (
+              <Box sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: 'rgba(196,149,106,0.08)', border: '1px solid', borderColor: 'rgba(196,149,106,0.3)', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <CircularProgress size={20} sx={{ color: 'secondary.main' }} />
+                <Typography variant="body2" color="secondary.main" sx={{ fontWeight: 500 }}>
+                  Generating AI background{Object.keys(generatingBg).length > 1 ? 's' : ''}... This may take a moment.
+                </Typography>
+              </Box>
+            )}
 
             {/* Existing images */}
             {productImages.length > 0 && (
               <ImageList cols={4} gap={8} sx={{ mb: 2 }}>
                 {productImages.map((img) => (
-                  <ImageListItem key={img.id} sx={{ borderRadius: 2, overflow: 'hidden', border: img.isPrimary ? '2px solid' : '1px solid', borderColor: img.isPrimary ? 'primary.main' : 'divider' }}>
+                  <ImageListItem key={img.id} sx={{ borderRadius: 2, overflow: 'hidden', border: img.isPrimary ? '2px solid' : '1px solid', borderColor: img.isPrimary ? 'primary.main' : img.isBgEnhanced ? 'secondary.main' : 'divider', position: 'relative' }}>
                     <img src={getImageUrl(img.url)} alt={img.alt || 'Product'} loading="lazy" style={{ height: 120, objectFit: 'cover' }} />
+                    {img.isBgEnhanced && (
+                      <Chip label="AI BG" size="small" icon={<Wallpaper sx={{ fontSize: 14 }} />}
+                        sx={{ position: 'absolute', top: 4, left: 4, bgcolor: 'rgba(196,149,106,0.9)', color: 'white', fontSize: 10, height: 20 }} />
+                    )}
+                    {generatingBg[img.id] && (
+                      <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.5)' }}>
+                        <CircularProgress size={24} sx={{ color: 'white' }} />
+                      </Box>
+                    )}
                     <ImageListItemBar
                       sx={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)' }}
                       actionIcon={
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          {!img.isBgEnhanced && !img.isAI && (
+                            <IconButton size="small" sx={{ color: 'white' }} onClick={() => handleGenerateBackground(img.id)} title="Generate AI background" disabled={!!generatingBg[img.id]}>
+                              <Wallpaper fontSize="small" />
+                            </IconButton>
+                          )}
                           <IconButton size="small" sx={{ color: 'white' }} onClick={() => handleSetPrimary(img.id)} title="Set as primary">
                             {img.isPrimary ? <Star sx={{ color: '#ffd700' }} /> : <StarBorder />}
                           </IconButton>
@@ -523,6 +612,11 @@ const AdminProductEdit = () => {
                   <Typography variant="caption" color="text.secondary">
                     Supports JPG, PNG, WebP up to 5MB
                   </Typography>
+                  {autoGenBg && (
+                    <Typography variant="caption" sx={{ display: 'block', color: 'secondary.main', mt: 0.5 }}>
+                      AI will auto-generate a professional background for each image
+                    </Typography>
+                  )}
                 </>
               )}
             </Box>

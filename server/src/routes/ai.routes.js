@@ -5,7 +5,9 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { AppError } = require('../middleware/errorHandler');
 const { aiLimiter } = require('../middleware/rateLimiter');
 const { processQuery } = require('../ai/query');
-const { generateImageWithGemini } = require('../ai/provider');
+const { generateImageWithGemini, generateBackgroundWithGemini } = require('../ai/provider');
+const multer = require('multer');
+const bgUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const logger = require('../config/logger');
 
 // POST /api/ai/query — customer or admin AI query
@@ -219,6 +221,53 @@ router.post('/generate-image', authenticate, authorize('ADMIN', 'SUPER_ADMIN', '
     res.status(201).json({ success: true, data: { url, mimeType } });
   } catch (error) {
     logger.error(`Image generation failed: ${error.message}`);
+    next(error);
+  }
+});
+
+// POST /api/ai/enhance-background — take an uploaded product image and generate a professional bakery background
+router.post('/enhance-background', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), bgUpload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      throw new AppError('No image file uploaded', 400);
+    }
+
+    const productName = req.body.productName || '';
+    const imageMimeType = req.file.mimetype;
+    const imageBase64 = req.file.buffer.toString('base64');
+
+    logger.info(`Generating AI background for product: "${productName || 'unnamed'}" (${(req.file.size / 1024).toFixed(0)}KB)`);
+
+    // Send to Gemini for background enhancement
+    let imageResult;
+    try {
+      imageResult = await generateBackgroundWithGemini(imageBase64, imageMimeType, productName);
+    } catch (err) {
+      throw new AppError(`Background generation failed: ${err.message}`, 502);
+    }
+    const { data: base64Data, mimeType } = imageResult;
+
+    // Upload enhanced image to Supabase Storage
+    const { uploadToStorage } = require('../config/storage');
+    const ext = mimeType === 'image/jpeg' ? '.jpg' : '.png';
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fakeFile = {
+      originalname: `ai-background${ext}`,
+      buffer,
+      mimetype: mimeType,
+    };
+
+    let url;
+    try {
+      url = await uploadToStorage(fakeFile, 'ai-background');
+    } catch (err) {
+      throw new AppError(`Storage upload failed: ${err.message}`, 502);
+    }
+    logger.info(`AI background image uploaded to: ${url}`);
+
+    res.status(201).json({ success: true, data: { url, mimeType } });
+  } catch (error) {
+    logger.error(`Background generation failed: ${error.message}`);
     next(error);
   }
 });
