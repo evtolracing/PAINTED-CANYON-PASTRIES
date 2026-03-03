@@ -13,11 +13,11 @@ import { useCart } from '../../context/CartContext';
 import { useSnackbar } from '../../context/SnackbarContext';
 import { getImageUrl } from '../../utils/imageUrl';
 
-/* ── Best Sellers horizontal auto-scroll strip ── */
+/* ── Horizontal auto-scroll strip (reused for Best Sellers & Seasonal) ── */
 const CARD_WIDTH = 260;  // px per card
 const CARD_GAP = 16;     // px gap
 
-const BestSellersStrip = ({ products, loading, addItem, showSnackbar }) => {
+const BestSellersStrip = ({ products, loading, addItem, showSnackbar, fallbackEmoji = '🧁' }) => {
   const scrollRef = useRef(null);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -119,7 +119,7 @@ const BestSellersStrip = ({ products, loading, addItem, showSnackbar }) => {
                   sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
-                <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🧁</Typography>
+                <Typography variant="h3" sx={{ color: 'sandstone.300' }}>{fallbackEmoji}</Typography>
               )}
             </CardMedia>
             {product.badges?.length > 0 && (
@@ -542,129 +542,63 @@ const HomePage = () => {
       </Box>
 
       {/* Seasonal Collection */}
-      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 10 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, flexWrap: 'wrap', gap: 1 }}>
-          <Box>
-            <Typography variant="overline">Limited Time</Typography>
-            <Typography variant="h2">Seasonal Collection</Typography>
+      <Box sx={{ py: { xs: 5, md: 10 }, overflow: 'hidden' }}>
+        <Container maxWidth="lg">
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, flexWrap: 'wrap', gap: 1 }}>
+            <Box>
+              <Typography variant="overline">Limited Time</Typography>
+              <Typography variant="h2">Seasonal Collection</Typography>
+            </Box>
+            <Button component={Link} to="/shop" endIcon={<ArrowForward />}>
+              Shop Seasonal
+            </Button>
           </Box>
-          <Button component={Link} to="/shop" endIcon={<ArrowForward />}>
-            Shop Seasonal
-          </Button>
-        </Box>
+        </Container>
+
         {seasonal.length > 0 ? (
-          <Grid container spacing={{ xs: 2, md: 3 }}>
-            {seasonal.slice(0, 4).map((product) => (
-              <Grid item xs={6} sm={6} md={3} key={product.id}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                  }}
-                  component={Link}
-                  to={`/product/${product.slug}`}
-                >
-                  <Box sx={{ position: 'relative' }}>
-                    <CardMedia
-                      sx={{
-                        height: { xs: 150, sm: 180, md: 220 },
-                        bgcolor: 'sandstone.100',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {(product.images?.[0]?.url) ? (
-                        <Box component="img" src={getImageUrl(product.images[0].url)} alt={product.name}
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🍂</Typography>
-                      )}
-                    </CardMedia>
-                    {product.badges?.length > 0 && (
-                      <Stack direction="row" spacing={0.5} sx={{ position: 'absolute', top: 12, left: 12 }}>
-                        {product.badges.map((badge) => (
-                          <Chip
-                            key={badge}
-                            label={badge}
-                            size="small"
-                            color="primary"
-                            sx={{ fontWeight: 600, fontSize: '0.65rem' }}
-                          />
-                        ))}
-                      </Stack>
-                    )}
-                  </Box>
-                  <CardContent sx={{ flexGrow: 1, px: { xs: 1.5, md: 2 }, py: { xs: 1, md: 2 } }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem', display: { xs: 'none', sm: 'block' } }}>
-                      {product.category?.name}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', md: '1rem' }, mb: 0.5 }}>
-                      {product.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: { xs: 'none', sm: 'block' } }}>
-                      {product.shortDescription}
-                    </Typography>
-                    <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, fontSize: { xs: '0.9rem', md: '1rem' } }}>
-                      ${Number(product.basePrice).toFixed(2)}
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      fullWidth
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        addItem(product);
-                        showSnackbar(`${product.name} added to cart!`);
-                      }}
-                    >
-                      Add to Cart
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+          <BestSellersStrip
+            products={seasonal}
+            loading={loading}
+            addItem={addItem}
+            showSnackbar={showSnackbar}
+            fallbackEmoji="🍂"
+          />
         ) : (
-          <Grid container spacing={4} alignItems="center">
-            <Grid item xs={12} md={6}>
-              <Box
-                sx={{
-                  height: 400,
-                  borderRadius: 4,
-                  background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[200]} 0%, ${theme.palette.sandstone[300]} 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '4rem',
-                }}
-              >
-                🍂
-              </Box>
+          <Container maxWidth="lg">
+            <Grid container spacing={4} alignItems="center">
+              <Grid item xs={12} md={6}>
+                <Box
+                  sx={{
+                    height: 400,
+                    borderRadius: 4,
+                    background: (theme) => `linear-gradient(135deg, ${theme.palette.sandstone[200]} 0%, ${theme.palette.sandstone[300]} 100%)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '4rem',
+                  }}
+                >
+                  🍂
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3, maxWidth: 420 }}>
+                  Discover our rotating selection of seasonal pastries inspired by the changing desert landscape. 
+                  From prickly pear tarts to Joshua Tree honey croissants — available while they last.
+                </Typography>
+                <Button
+                  component={Link}
+                  to="/shop"
+                  variant="contained"
+                  endIcon={<ArrowForward />}
+                >
+                  Shop Seasonal
+                </Button>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3, maxWidth: 420 }}>
-                Discover our rotating selection of seasonal pastries inspired by the changing desert landscape. 
-                From prickly pear tarts to Joshua Tree honey croissants — available while they last.
-              </Typography>
-              <Button
-                component={Link}
-                to="/shop"
-                variant="contained"
-                endIcon={<ArrowForward />}
-              >
-                Shop Seasonal
-              </Button>
-            </Grid>
-          </Grid>
+          </Container>
         )}
-      </Container>
+      </Box>
 
       {/* Testimonials */}
       <Box sx={{ bgcolor: (theme) => theme.palette.mode === 'dark' ? '#2a1f1a' : 'secondary.main', color: 'white', py: { xs: 5, md: 10 } }}>

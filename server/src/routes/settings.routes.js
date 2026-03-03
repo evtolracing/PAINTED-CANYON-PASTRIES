@@ -122,19 +122,24 @@ router.get('/homepage', async (req, res, next) => {
       variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
     };
 
-    // Fetch best sellers (all products with "Best Seller" badge), seasonal, and products with images
+    // Fetch best sellers, seasonal (by badge), and products with images
     const [bestSellers, seasonal, withImages] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true, badges: { has: 'Best Seller' } },
         include: productInclude,
         orderBy: { sortOrder: 'asc' },
       }),
-      seasonalIds.length > 0
-        ? prisma.product.findMany({
-            where: { id: { in: seasonalIds }, isActive: true },
-            include: productInclude,
-          })
-        : [],
+      prisma.product.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { badges: { has: 'Seasonal' } },
+            { badges: { has: 'Limited' } },
+          ],
+        },
+        include: productInclude,
+        orderBy: { sortOrder: 'asc' },
+      }),
       prisma.product.findMany({
         where: {
           isActive: true,
@@ -146,12 +151,9 @@ router.get('/homepage', async (req, res, next) => {
       }),
     ]);
 
-    // Best sellers are already ordered by sortOrder from query
+    // Both are already ordered by sortOrder from query
     const orderedBestSellers = bestSellers;
-
-    const orderedSeasonal = seasonalIds
-      .map(id => seasonal.find(p => p.id === id))
-      .filter(Boolean);
+    const orderedSeasonal = seasonal;
 
     res.json({
       success: true,
