@@ -76,10 +76,10 @@ const PublicLayout = () => {
                   component="img"
                   src={getImageUrl(bakeryLogo)}
                   alt="Logo"
-                  sx={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 1 }}
+                  sx={{ width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 }, objectFit: 'contain', borderRadius: 1 }}
                 />
               ) : (
-                <StorefrontOutlined sx={{ color: 'primary.main', fontSize: 28 }} />
+                <StorefrontOutlined sx={{ color: 'primary.main', fontSize: { xs: 24, md: 28 } }} />
               )}
               <Box>
                 <Typography
@@ -88,7 +88,7 @@ const PublicLayout = () => {
                     fontFamily: '"Playfair Display", serif',
                     fontWeight: 700,
                     color: 'secondary.main',
-                    fontSize: '1.1rem',
+                    fontSize: { xs: '0.85rem', md: '1.1rem' },
                     lineHeight: 1.2,
                     letterSpacing: '0.02em',
                   }}
@@ -98,7 +98,7 @@ const PublicLayout = () => {
                 <Typography
                   sx={{
                     fontFamily: '"DM Sans", sans-serif',
-                    fontSize: '0.65rem',
+                    fontSize: { xs: '0.55rem', md: '0.65rem' },
                     fontWeight: 600,
                     letterSpacing: '0.18em',
                     color: 'primary.main',
@@ -268,16 +268,16 @@ const PublicLayout = () => {
           bgcolor: 'secondary.main',
           color: 'white',
           mt: 'auto',
-          py: 6,
+          py: { xs: 4, md: 6 },
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '2fr 1fr 1fr 1fr 1fr' }, gap: 4 }}>
-            <Box>
-              <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', mb: 1 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr', md: '2fr 1fr 1fr 1fr 1fr' }, gap: { xs: 3, md: 4 } }}>
+            <Box sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }}>
+              <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif', mb: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>
                 Painted Canyon Pastries
               </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', maxWidth: 280 }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', maxWidth: 280, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>
                 Artisan baked goods crafted with love in Joshua Tree, California. Inspired by the desert, made for your table.
               </Typography>
             </Box>

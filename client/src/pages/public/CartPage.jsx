@@ -44,10 +44,10 @@ const CartPage = () => {
 
   if (items.length === 0) {
     return (
-      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 5, md: 10 } }}>
+      <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 3, md: 10 } }}>
         <Container maxWidth="sm" sx={{ textAlign: 'center' }}>
-          <ShoppingCart sx={{ fontSize: 80, color: 'sandstone.300', mb: 2 }} />
-          <Typography variant="h3" gutterBottom>Your cart is empty</Typography>
+          <ShoppingCart sx={{ fontSize: { xs: 60, md: 80 }, color: 'sandstone.300', mb: 2 }} />
+          <Typography variant="h3" gutterBottom sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>Your cart is empty</Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
             Looks like you haven't added any pastries yet. Let's fix that!
           </Typography>
@@ -60,11 +60,11 @@ const CartPage = () => {
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 3, md: 5 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 5 } }}>
       <Container maxWidth="lg">
-        <Typography variant="h2" gutterBottom>Your Cart</Typography>
+        <Typography variant="h2" gutterBottom sx={{ fontSize: { xs: '1.5rem', md: '2.25rem' } }}>Your Cart</Typography>
 
-        <Grid container spacing={4}>
+        <Grid container spacing={{ xs: 2, md: 4 }}>
           {/* Cart Items */}
           <Grid item xs={12} md={8}>
             <Stack spacing={2}>
@@ -72,7 +72,7 @@ const CartPage = () => {
                 <Paper
                   key={item.id}
                   elevation={1}
-                  sx={{ p: 2, borderRadius: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: { xs: 'wrap', sm: 'nowrap' } }}
+                  sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: { xs: 2, md: 3 }, display: 'flex', gap: { xs: 1, sm: 2 }, alignItems: 'center', flexWrap: { xs: 'wrap', sm: 'nowrap' } }}
                 >
                   {/* Image */}
                   <Box
@@ -146,8 +146,8 @@ const CartPage = () => {
 
           {/* Summary */}
           <Grid item xs={12} md={4}>
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 3, position: 'sticky', top: 100 }}>
-              <Typography variant="h5" gutterBottom>Order Summary</Typography>
+            <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, borderRadius: { xs: 2, md: 3 }, position: { md: 'sticky' }, top: { md: 100 } }}>
+              <Typography variant="h5" gutterBottom sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}>Order Summary</Typography>
               <Divider sx={{ mb: 2 }} />
 
               <Stack spacing={1.5}>

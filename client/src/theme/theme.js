@@ -1,4 +1,4 @@
-import { createTheme, alpha } from '@mui/material/styles';
+import { createTheme, alpha, responsiveFontSizes } from '@mui/material/styles';
 
 // Painted Canyon Pastries brand palette
 const palette = {
@@ -318,4 +318,4 @@ const theme = createTheme({
   },
 });
 
-export default theme;
+export default responsiveFontSizes(theme);

@@ -105,11 +105,12 @@ const HomePage = () => {
       <Box
         sx={{
           position: 'relative',
-          minHeight: { xs: '70vh', md: '85vh' },
+          minHeight: { xs: 'auto', md: '85vh' },
           display: 'flex',
           alignItems: 'center',
           background: 'linear-gradient(135deg, #faf7f2 0%, #f5efe5 50%, #ebe0cc 100%)',
           overflow: 'hidden',
+          py: { xs: 4, md: 0 },
         }}
       >
         {/* Decorative elements */}
@@ -137,21 +138,21 @@ const HomePage = () => {
         />
 
         <Container maxWidth="lg">
-          <Grid container spacing={6} alignItems="center">
+          <Grid container spacing={{ xs: 3, md: 6 }} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography
                 variant="overline"
-                sx={{ fontSize: '0.8rem', mb: 2, display: 'block', letterSpacing: '0.15em' }}
+                sx={{ fontSize: { xs: '0.7rem', md: '0.8rem' }, mb: { xs: 1, md: 2 }, display: 'block', letterSpacing: '0.15em' }}
               >
                 Joshua Tree, California
               </Typography>
-              <Typography variant="h1" sx={{ mb: 3, fontSize: { xs: '2.5rem', md: '3.5rem' } }}>
+              <Typography variant="h1" sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '2rem', sm: '2.5rem', md: '3.5rem' } }}>
                 Artisan pastries crafted with
                 <Box component="span" sx={{ color: 'primary.main', display: 'block' }}>
                   desert soul
                 </Box>
               </Typography>
-              <Typography variant="body1" sx={{ mb: 4, maxWidth: 480, fontSize: '1.1rem', color: 'text.secondary' }}>
+              <Typography variant="body1" sx={{ mb: { xs: 3, md: 4 }, maxWidth: 480, fontSize: { xs: '0.95rem', md: '1.1rem' }, color: 'text.secondary' }}>
                 Handmade cookies, croissants, cakes, and seasonal creations baked fresh daily.
                 Order for pickup or local delivery.
               </Typography>
@@ -177,12 +178,12 @@ const HomePage = () => {
                 </Button>
               </Stack>
             </Grid>
-            <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Grid item xs={12} md={6}>
               <Box
                 sx={{
                   width: '100%',
-                  height: 500,
-                  borderRadius: 4,
+                  height: { xs: 280, sm: 380, md: 500 },
+                  borderRadius: { xs: 3, md: 4 },
                   position: 'relative',
                   overflow: 'hidden',
                   boxShadow: '0 20px 60px rgba(139,101,68,0.3)',
@@ -327,11 +328,11 @@ const HomePage = () => {
       </Box>
 
       {/* How It Works */}
-      <Container maxWidth="lg" sx={{ py: 10 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 10 } }}>
         <Typography variant="h2" align="center" sx={{ mb: 1 }}>
           How It Works
         </Typography>
-        <Typography variant="body1" align="center" sx={{ color: 'text.secondary', mb: 6, maxWidth: 500, mx: 'auto' }}>
+        <Typography variant="body1" align="center" sx={{ color: 'text.secondary', mb: { xs: 3, md: 6 }, maxWidth: 500, mx: 'auto' }}>
           Fresh-baked to order with convenient pickup and local delivery options.
         </Typography>
         <Grid container spacing={4}>
@@ -363,9 +364,9 @@ const HomePage = () => {
       </Container>
 
       {/* Best Sellers */}
-      <Box sx={{ bgcolor: 'background.paper', py: 10 }}>
+      <Box sx={{ bgcolor: 'background.paper', py: { xs: 5, md: 10 } }}>
         <Container maxWidth="lg">
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, flexWrap: 'wrap', gap: 1 }}>
             <Box>
               <Typography variant="overline">Customer Favorites</Typography>
               <Typography variant="h2">Best Sellers</Typography>
@@ -375,9 +376,9 @@ const HomePage = () => {
             </Button>
           </Box>
 
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 2, md: 3 }}>
             {(loading ? Array(4).fill(null) : bestSellers.slice(0, 4)).map((product, i) => (
-              <Grid item xs={12} sm={6} md={3} key={product?.id || i}>
+              <Grid item xs={6} sm={6} md={3} key={product?.id || i}>
                 {loading ? (
                   <Card>
                     <Skeleton variant="rectangular" height={220} />
@@ -402,7 +403,7 @@ const HomePage = () => {
                     <Box sx={{ position: 'relative' }}>
                       <CardMedia
                         sx={{
-                          height: 220,
+                          height: { xs: 150, sm: 180, md: 220 },
                           bgcolor: 'sandstone.100',
                           display: 'flex',
                           alignItems: 'center',
@@ -431,21 +432,21 @@ const HomePage = () => {
                         </Stack>
                       )}
                     </Box>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                    <CardContent sx={{ flexGrow: 1, px: { xs: 1.5, md: 2 }, py: { xs: 1, md: 2 } }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem', display: { xs: 'none', sm: 'block' } }}>
                         {product.category?.name}
                       </Typography>
-                      <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
+                      <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', md: '1rem' }, mb: 0.5 }}>
                         {product.name}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: { xs: 'none', sm: 'block' } }}>
                         {product.shortDescription}
                       </Typography>
-                      <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
+                      <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                         ${Number(product.basePrice).toFixed(2)}
                       </Typography>
                     </CardContent>
-                    <CardActions sx={{ px: 2, pb: 2 }}>
+                    <CardActions sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
                       <Button
                         size="small"
                         variant="outlined"
@@ -469,8 +470,8 @@ const HomePage = () => {
       </Box>
 
       {/* Seasonal Collection */}
-      <Container maxWidth="lg" sx={{ py: 10 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 10 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, md: 4 }, flexWrap: 'wrap', gap: 1 }}>
           <Box>
             <Typography variant="overline">Limited Time</Typography>
             <Typography variant="h2">Seasonal Collection</Typography>
@@ -480,9 +481,9 @@ const HomePage = () => {
           </Button>
         </Box>
         {seasonal.length > 0 ? (
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 2, md: 3 }}>
             {seasonal.slice(0, 4).map((product) => (
-              <Grid item xs={12} sm={6} md={3} key={product.id}>
+              <Grid item xs={6} sm={6} md={3} key={product.id}>
                 <Card
                   sx={{
                     height: '100%',
@@ -497,7 +498,7 @@ const HomePage = () => {
                   <Box sx={{ position: 'relative' }}>
                     <CardMedia
                       sx={{
-                        height: 220,
+                        height: { xs: 150, sm: 180, md: 220 },
                         bgcolor: 'sandstone.100',
                         display: 'flex',
                         alignItems: 'center',
@@ -525,21 +526,21 @@ const HomePage = () => {
                       </Stack>
                     )}
                   </Box>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                  <CardContent sx={{ flexGrow: 1, px: { xs: 1.5, md: 2 }, py: { xs: 1, md: 2 } }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ fontSize: '0.7rem', display: { xs: 'none', sm: 'block' } }}>
                       {product.category?.name}
                     </Typography>
-                    <Typography variant="h6" sx={{ fontSize: '1rem', mb: 0.5 }}>
+                    <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', md: '1rem' }, mb: 0.5 }}>
                       {product.name}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1, display: { xs: 'none', sm: 'block' } }}>
                       {product.shortDescription}
                     </Typography>
-                    <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
+                    <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                       ${Number(product.basePrice).toFixed(2)}
                     </Typography>
                   </CardContent>
-                  <CardActions sx={{ px: 2, pb: 2 }}>
+                  <CardActions sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
                     <Button
                       size="small"
                       variant="outlined"
@@ -594,12 +595,12 @@ const HomePage = () => {
       </Container>
 
       {/* Testimonials */}
-      <Box sx={{ bgcolor: 'secondary.main', color: 'white', py: 10 }}>
+      <Box sx={{ bgcolor: 'secondary.main', color: 'white', py: { xs: 5, md: 10 } }}>
         <Container maxWidth="lg">
-          <Typography variant="h2" align="center" sx={{ color: 'white', mb: 6 }}>
+          <Typography variant="h2" align="center" sx={{ color: 'white', mb: { xs: 3, md: 6 } }}>
             What Locals Say
           </Typography>
-          <Grid container spacing={3}>
+          <Grid container spacing={{ xs: 2, md: 3 }}>
             {testimonials.map((t, i) => (
               <Grid item xs={12} md={4} key={i}>
                 <Paper
@@ -627,9 +628,9 @@ const HomePage = () => {
       </Box>
 
       {/* From Our Bakery */}
-      <Container maxWidth="lg" sx={{ py: 10 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 10 } }}>
         <Typography variant="h2" align="center" sx={{ mb: 1 }}>From Our Bakery</Typography>
-        <Typography variant="body1" align="center" sx={{ color: 'text.secondary', mb: 4 }}>
+        <Typography variant="body1" align="center" sx={{ color: 'text.secondary', mb: { xs: 2, md: 4 } }}>
           @paintedcanyonpastries
         </Typography>
         <Grid container spacing={2}>
@@ -726,7 +727,7 @@ const HomePage = () => {
       <Box
         sx={{
           background: 'linear-gradient(135deg, #f5efe5 0%, #ebe0cc 100%)',
-          py: 8,
+          py: { xs: 5, md: 8 },
         }}
       >
         <Container maxWidth="sm">

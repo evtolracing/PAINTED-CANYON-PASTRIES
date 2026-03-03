@@ -103,10 +103,10 @@ const ProductPage = () => {
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 3, md: 5 } }}>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 5 } }}>
       <Container maxWidth="lg">
         {/* Breadcrumbs */}
-        <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 3 }}>
+        <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: { xs: 2, md: 3 }, display: { xs: 'none', sm: 'flex' } }}>
           <Typography component={Link} to="/" color="inherit" sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' } }}>
             Home
           </Typography>
@@ -122,16 +122,16 @@ const ProductPage = () => {
           <Typography color="text.primary">{product.name}</Typography>
         </Breadcrumbs>
 
-        <Grid container spacing={4}>
+        <Grid container spacing={{ xs: 2, md: 4 }}>
           {/* Image */}
           <Grid item xs={12} md={6}>
             <Paper
               elevation={0}
               sx={{
-                borderRadius: 3,
+                borderRadius: { xs: 2, md: 3 },
                 overflow: 'hidden',
                 bgcolor: 'sandstone.100',
-                height: { xs: 300, md: 450 },
+                height: { xs: 250, sm: 350, md: 450 },
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -154,10 +154,10 @@ const ProductPage = () => {
 
           {/* Details */}
           <Grid item xs={12} md={6}>
-            <Stack spacing={2}>
-              <Typography variant="h3">{product.name}</Typography>
+            <Stack spacing={{ xs: 1.5, md: 2 }}>
+              <Typography variant="h3" sx={{ fontSize: { xs: '1.5rem', md: '1.75rem' } }}>{product.name}</Typography>
 
-              <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700 }}>
+              <Typography variant="h4" color="primary.main" sx={{ fontWeight: 700, fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
                 ${(currentPrice + addonsTotal).toFixed(2)}
                 {quantity > 1 && (
                   <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
@@ -255,7 +255,7 @@ const ProductPage = () => {
               <Divider />
 
               {/* Quantity & Add to Cart */}
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={{ xs: 1, md: 2 }} alignItems="center">
                 <Paper
                   variant="outlined"
                   sx={{ display: 'flex', alignItems: 'center', borderRadius: 2, overflow: 'hidden' }}
@@ -286,9 +286,9 @@ const ProductPage = () => {
 
         {/* Pairs Well With */}
         {related.length > 0 && (
-          <Box sx={{ mt: 8 }}>
-            <Typography variant="h4" gutterBottom>Pairs Well With</Typography>
-            <Grid container spacing={3}>
+          <Box sx={{ mt: { xs: 4, md: 8 } }}>
+            <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>Pairs Well With</Typography>
+            <Grid container spacing={{ xs: 1.5, md: 3 }}>
               {related.map((p) => (
                 <Grid item xs={6} sm={3} key={p.id}>
                   <Card
@@ -303,7 +303,7 @@ const ProductPage = () => {
                     elevation={1}
                   >
                     <CardMedia
-                      sx={{ height: 140, bgcolor: 'sandstone.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      sx={{ height: { xs: 100, sm: 140 }, bgcolor: 'sandstone.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       {(p.images?.[0]?.url || p.imageUrl) ? (
                         <Box component="img" src={getImageUrl(p.images?.[0]?.url || p.imageUrl)} alt={p.name}

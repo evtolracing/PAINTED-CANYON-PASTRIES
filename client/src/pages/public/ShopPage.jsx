@@ -118,18 +118,18 @@ const ShopPage = () => {
   );
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 3, md: 5 } }}>
-      <Container maxWidth="xl">
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: { xs: 2, md: 5 } }}>
+      <Container maxWidth="lg">
         {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h2" gutterBottom>Our Pastries</Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600 }}>
+        <Box sx={{ mb: { xs: 2, md: 4 } }}>
+          <Typography variant="h2" gutterBottom sx={{ fontSize: { xs: '1.5rem', md: '2.25rem' } }}>Our Pastries</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, display: { xs: 'none', sm: 'block' } }}>
             Handcrafted daily with the finest ingredients, inspired by the beauty of the desert Southwest.
           </Typography>
         </Box>
 
         {/* Search & Filter Bar */}
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: { xs: 2, md: 3 } }}>
           <TextField
             placeholder="Search pastries…"
             size="small"
@@ -177,9 +177,9 @@ const ShopPage = () => {
             {isMobile && categoryTabs}
 
             {loading ? (
-              <Grid container spacing={3}>
+              <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
+                  <Grid item xs={6} sm={6} md={4} lg={3} key={i}>
                     <Card sx={{ borderRadius: 3 }}>
                       <Skeleton variant="rectangular" height={200} />
                       <CardContent>
@@ -199,11 +199,11 @@ const ShopPage = () => {
                 </Typography>
               </Box>
             ) : (
-              <Grid container spacing={3}>
+              <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }}>
                 {filtered.map((product) => {
                   const badge = getBadge(product);
                   return (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+                    <Grid item xs={6} sm={6} md={4} lg={3} key={product.id}>
                       <Card
                         sx={{
                           borderRadius: 3,
@@ -230,7 +230,7 @@ const ShopPage = () => {
                           component={Link}
                           to={`/product/${product.slug || product.id}`}
                           sx={{
-                            height: 200,
+                            height: { xs: 140, sm: 170, md: 200 },
                             bgcolor: 'sandstone.100',
                             display: 'flex',
                             alignItems: 'center',
@@ -245,25 +245,25 @@ const ShopPage = () => {
                             <Typography variant="h3" sx={{ color: 'sandstone.300' }}>🥐</Typography>
                           )}
                         </CardMedia>
-                        <CardContent sx={{ flexGrow: 1 }}>
+                        <CardContent sx={{ flexGrow: 1, px: { xs: 1.5, md: 2 }, py: { xs: 1, md: 2 } }}>
                           <Typography
                             variant="h6"
                             component={Link}
                             to={`/product/${product.slug || product.id}`}
-                            sx={{ textDecoration: 'none', color: 'text.primary', '&:hover': { color: 'primary.main' } }}
+                            sx={{ textDecoration: 'none', color: 'text.primary', '&:hover': { color: 'primary.main' }, fontSize: { xs: '0.85rem', md: '1rem' } }}
                           >
                             {product.name}
                           </Typography>
-                          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, mt: 0.5 }}>
+                          <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700, mt: 0.5, fontSize: { xs: '0.9rem', md: '1rem' } }}>
                             ${Number(product.basePrice || product.price || 0).toFixed(2)}
                           </Typography>
                           {product.shortDescription && (
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, lineHeight: 1.5 }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, lineHeight: 1.5, display: { xs: 'none', sm: 'block' } }}>
                               {product.shortDescription}
                             </Typography>
                           )}
                         </CardContent>
-                        <CardActions sx={{ px: 2, pb: 2 }}>
+                        <CardActions sx={{ px: { xs: 1.5, md: 2 }, pb: { xs: 1.5, md: 2 } }}>
                           <Button
                             variant="contained"
                             size="small"
