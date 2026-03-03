@@ -18,7 +18,7 @@ const BUDGET_RANGES = [
 ];
 
 const offerings = [
-  { icon: <Cake />, title: 'Custom Cakes', desc: 'Tiered cakes for weddings, birthdays, and celebrations.' },
+  { icon: <Cake />, title: 'Custom Cakes', desc: 'Sheet cakes and specialty cakes for birthdays, showers, and celebrations.' },
   { icon: <Restaurant />, title: 'Pastry Platters', desc: 'Curated assortments of our best-selling pastries.' },
   { icon: <Groups />, title: 'Corporate Events', desc: 'Breakfast meetings, office parties, and team celebrations.' },
   { icon: <CalendarMonth />, title: 'Seasonal Specials', desc: 'Holiday-themed treats and seasonal menu options.' },
