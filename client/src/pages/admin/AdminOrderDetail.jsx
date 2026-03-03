@@ -309,7 +309,7 @@ const AdminOrderDetail = () => {
                   {order.items?.map(item => (
                     <React.Fragment key={item.id}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600 }}>{item.product?.name || 'Product'}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{item.product?.name || item.productName || 'Deleted product'}</TableCell>
                         <TableCell>{item.variant?.name || '—'}</TableCell>
                         <TableCell align="center">{item.quantity}</TableCell>
                         <TableCell align="right">${parseFloat(item.unitPrice).toFixed(2)}</TableCell>

@@ -343,7 +343,7 @@ const OrderDetailDialog = ({ order, open, onClose }) => {
             {order.items.map((item, i) => (
               <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.25 }}>
                 <Typography fontSize="0.8rem">
-                  {item.quantity}× {item.product?.name || 'Item'} {item.variant ? `(${item.variant.name})` : ''}
+                  {item.quantity}× {item.product?.name || item.productName || 'Item'} {item.variant ? `(${item.variant.name})` : ''}
                 </Typography>
                 <Typography fontSize="0.8rem" fontWeight={600}>${Number(item.totalPrice).toFixed(2)}</Typography>
               </Box>

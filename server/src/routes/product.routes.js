@@ -270,22 +270,35 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
   }
 });
 
-// DELETE /api/products/:id — soft-delete (deactivate) or hard-delete
+// DELETE /api/products/:id — permanently delete a product
 router.delete('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { hard } = req.query;
 
-    const existing = await prisma.product.findUnique({ where: { id } });
+    const existing = await prisma.product.findUnique({ where: { id }, include: { variants: true } });
     if (!existing) throw new AppError('Product not found', 404);
 
-    if (hard === 'true') {
-      await prisma.product.delete({ where: { id } });
-      res.json({ success: true, message: 'Product permanently deleted' });
-    } else {
-      await prisma.product.update({ where: { id }, data: { isActive: false } });
-      res.json({ success: true, message: 'Product deactivated' });
+    // Preserve product name in any existing order items before delete
+    // (SetNull will clear productId; productName keeps the history)
+    await prisma.orderItem.updateMany({
+      where: { productId: id },
+      data: { productName: existing.name },
+    });
+
+    // Also stamp variant names into notes for variant order items
+    for (const v of existing.variants) {
+      await prisma.orderItem.updateMany({
+        where: { variantId: v.id, productName: null },
+        data: { productName: `${existing.name} (${v.name})` },
+      });
     }
+
+    // Delete product — cascades to variants, addons, images,
+    // allergen tags, pairings, recipe items.
+    // OrderItem.productId / variantId set to null via SetNull.
+    await prisma.product.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Product permanently deleted' });
   } catch (error) {
     next(error);
   }

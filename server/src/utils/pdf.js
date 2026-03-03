@@ -55,7 +55,7 @@ const generatePackSlip = (order) => {
       for (const item of (order.items || [])) {
         const y = doc.y;
         doc.text(String(item.quantity), 50, y, { width: 40 });
-        let itemName = item.product?.name || 'Item';
+        let itemName = item.product?.name || item.productName || 'Item';
         if (item.variant) itemName += ` - ${item.variant.name}`;
         doc.text(itemName, 100, y, { width: 300 });
         doc.text(item.notes || '', 410, y, { width: 140 });
@@ -124,7 +124,7 @@ const generateReceipt = (order) => {
 
       // Items
       for (const item of (order.items || [])) {
-        let name = item.product?.name || 'Item';
+        let name = item.product?.name || item.productName || 'Item';
         if (item.variant) name += ` (${item.variant.name})`;
         doc.text(`${item.quantity}x ${name}`);
         doc.text(`   $${Number(item.totalPrice).toFixed(2)}`, { align: 'right' });

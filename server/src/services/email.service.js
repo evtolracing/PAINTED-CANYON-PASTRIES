@@ -91,7 +91,7 @@ const buildOrderItemsTable = (order) => {
   const itemsHtml = order.items?.map(item => `
     <tr>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3;">
-        ${item.product?.name || 'Item'}${item.variant ? ` - ${item.variant.name}` : ''}
+        ${item.product?.name || item.productName || 'Item'}${item.variant ? ` - ${item.variant.name}` : ''}
       </td>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: center;">${item.quantity}</td>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: right;">$${Number(item.totalPrice).toFixed(2)}</td>
@@ -144,7 +144,7 @@ const orderConfirmationTemplate = (order) => {
   const itemsHtml = order.items?.map(item => `
     <tr>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3;">
-        ${item.product?.name || 'Item'}${item.variant ? ` - ${item.variant.name}` : ''}
+        ${item.product?.name || item.productName || 'Item'}${item.variant ? ` - ${item.variant.name}` : ''}
       </td>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: center;">${item.quantity}</td>
       <td style="padding: 8px 0; border-bottom: 1px solid #f0ebe3; text-align: right;">$${Number(item.totalPrice).toFixed(2)}</td>
