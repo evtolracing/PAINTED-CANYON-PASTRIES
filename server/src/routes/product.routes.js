@@ -174,6 +174,9 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), val
         .replace(/^-|-$/g, '');
     }
 
+    // Normalize empty SKU to null (unique constraint)
+    if (!productData.sku) productData.sku = null;
+
     const product = await prisma.product.create({
       data: {
         ...productData,
@@ -186,7 +189,7 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), val
           },
         }),
         ...(variants?.length && {
-          variants: { create: variants.map(({ id: _id, isNew: _isNew, ...v }) => v) },
+          variants: { create: variants.map(({ id: _id, isNew: _isNew, ...v }) => ({ ...v, sku: v.sku || null })) },
         }),
         ...(addons?.length && {
           addons: { create: addons.map(({ id: _id, isNew: _isNew, ...a }) => a) },
@@ -213,6 +216,9 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
     const { id } = req.params;
     const { allergenIds, variants, addons, ...productData } = req.body;
 
+    // Normalize empty SKU to null (unique constraint)
+    if ('sku' in productData && !productData.sku) productData.sku = null;
+
     // Verify exists
     const existing = await prisma.product.findUnique({ where: { id } });
     if (!existing) throw new AppError('Product not found', 404);
@@ -237,7 +243,7 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
         await tx.productVariant.deleteMany({ where: { productId: id } });
         if (variants.length) {
           await tx.productVariant.createMany({
-            data: variants.map(({ id: _id, isNew: _isNew, ...v }) => ({ ...v, productId: id })),
+            data: variants.map(({ id: _id, isNew: _isNew, ...v }) => ({ ...v, sku: v.sku || null, productId: id })),
           });
         }
       }
