@@ -8,18 +8,11 @@ const { authenticate, optionalAuth, authorize } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { AppError } = require('../middleware/errorHandler');
 const { productSchema, updateProductSchema } = require('../validators/product.validator');
+const { uploadToStorage, deleteFromStorage } = require('../config/storage');
 
 // ─── Image upload config ─────────────────────────────────
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, './uploads'),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `product-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-  },
-});
-
 const imageUpload = multer({
-  storage: imageStorage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimetype)) {
       cb(null, true);
@@ -315,17 +308,18 @@ router.post('/:id/images', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANA
     const existingCount = await prisma.productImage.count({ where: { productId: id } });
 
     const images = await Promise.all(
-      req.files.map((file, index) =>
-        prisma.productImage.create({
+      req.files.map(async (file, index) => {
+        const url = await uploadToStorage(file, 'products');
+        return prisma.productImage.create({
           data: {
             productId: id,
-            url: `/uploads/${file.filename}`,
+            url,
             alt: existing.name,
-            isPrimary: existingCount === 0 && index === 0, // first image is primary if none exist
+            isPrimary: existingCount === 0 && index === 0,
             sortOrder: existingCount + index,
           },
-        })
-      )
+        });
+      })
     );
 
     res.status(201).json({ success: true, data: images });
@@ -385,6 +379,8 @@ router.delete('/:id/images/:imageId', authenticate, authorize('ADMIN', 'SUPER_AD
     const image = await prisma.productImage.findUnique({ where: { id: imageId } });
     if (!image) throw new AppError('Image not found', 404);
     await prisma.productImage.delete({ where: { id: imageId } });
+    // Clean up from storage
+    if (image.url) deleteFromStorage(image.url).catch(() => {});
     res.json({ success: true, message: 'Image deleted' });
   } catch (error) {
     next(error);
