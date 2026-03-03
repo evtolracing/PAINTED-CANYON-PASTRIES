@@ -44,15 +44,17 @@ const FAQPage = () => {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       {/* Header */}
       <Box
-        sx={{
-          background: 'linear-gradient(135deg, #faf7f2 0%, #ebe0cc 100%)',
+        sx={(theme) => ({
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, #2a2520 0%, #3d352a 100%)'
+            : 'linear-gradient(135deg, #faf7f2 0%, #ebe0cc 100%)',
           py: { xs: 6, md: 10 },
           textAlign: 'center',
-        }}
+        })}
       >
         <Container maxWidth="sm">
           <HelpOutline sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h1" gutterBottom>Frequently Asked Questions</Typography>
+          <Typography variant="h1" color="text.primary" gutterBottom>Frequently Asked Questions</Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             Find answers to common questions about our products, ordering, and policies.
           </Typography>
@@ -65,7 +67,7 @@ const FAQPage = () => {
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
             }}
-            sx={{ maxWidth: 500, mx: 'auto', bgcolor: '#fff', borderRadius: 2 }}
+            sx={{ maxWidth: 500, mx: 'auto', bgcolor: 'background.paper', borderRadius: 2 }}
           />
         </Container>
       </Box>
