@@ -118,7 +118,7 @@ router.get('/homepage', async (req, res, next) => {
 
     const productInclude = {
       category: { select: { id: true, name: true, slug: true } },
-      images: { orderBy: { sortOrder: 'asc' } },
+      images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
       variants: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } },
     };
 

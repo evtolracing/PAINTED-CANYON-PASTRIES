@@ -139,12 +139,16 @@ const ProductPage = () => {
                 borderColor: 'divider',
               }}
             >
-              {(product.images?.[0]?.url || product.imageUrl) ? (
-                <Box component="img" src={getImageUrl(product.images?.[0]?.url || product.imageUrl)} alt={product.name}
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <Typography variant="h1" sx={{ fontSize: '6rem', color: 'sandstone.300' }}>🎂</Typography>
-              )}
+              {(() => {
+                const primaryImg = product.images?.find(i => i.isPrimary) || product.images?.[0];
+                const imgUrl = primaryImg?.url || product.imageUrl;
+                return imgUrl ? (
+                  <Box component="img" src={getImageUrl(imgUrl)} alt={product.name}
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <Typography variant="h1" sx={{ fontSize: '6rem', color: 'sandstone.300' }}>🎂</Typography>
+                );
+              })()}
             </Paper>
           </Grid>
 

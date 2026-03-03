@@ -125,7 +125,7 @@ router.get('/:idOrSlug', optionalAuth, async (req, res, next) => {
         category: true,
         variants: { orderBy: { sortOrder: 'asc' } },
         addons: { orderBy: { sortOrder: 'asc' } },
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
         allergenTags: { include: { allergen: true } },
         pairsWithFrom: {
           include: {
@@ -193,7 +193,7 @@ router.post('/', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), val
         variants: true,
         addons: true,
         allergenTags: { include: { allergen: true } },
-        images: true,
+        images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
       },
     });
 
@@ -259,7 +259,7 @@ router.put('/:id', authenticate, authorize('ADMIN', 'SUPER_ADMIN', 'MANAGER'), v
           variants: true,
           addons: true,
           allergenTags: { include: { allergen: true } },
-          images: true,
+          images: { orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
         },
       });
     });
