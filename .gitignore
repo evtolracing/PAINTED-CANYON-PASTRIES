@@ -5,6 +5,7 @@ dist/
 build/
 coverage/
 *.log
+*.err
 .DS_Store
 Thumbs.db
 server/prisma/*.db
